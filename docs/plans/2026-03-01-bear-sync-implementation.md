@@ -74,11 +74,11 @@
 
 ### Task 6: Hub main (`cmd/hub`)
 
-- [ ] `main.go` — чтение конфигурации из env (`HUB_PORT`, `HUB_DB_PATH`, `HUB_OPENCLAW_TOKEN`, `HUB_BRIDGE_TOKEN`, `HUB_ATTACHMENTS_DIR`)
-- [ ] Инициализация SQLiteStore, API server
-- [ ] Graceful shutdown: перехват `SIGTERM`/`SIGINT` → `context.WithCancel` → `http.Server.Shutdown(ctx)` таймаут 10 сек → закрытие SQLite
-- [ ] Структурированное логирование через `slog` (JSON в production)
-- [ ] Bind на `127.0.0.1:PORT` (только localhost, Caddy проксирует)
+- [x] `main.go` — чтение конфигурации из env (`HUB_PORT`, `HUB_DB_PATH`, `HUB_OPENCLAW_TOKEN`, `HUB_BRIDGE_TOKEN`, `HUB_ATTACHMENTS_DIR`)
+- [x] Инициализация SQLiteStore, API server
+- [x] Graceful shutdown: перехват `SIGTERM`/`SIGINT` → `context.WithCancel` → `http.Server.Shutdown(ctx)` таймаут 10 сек → закрытие SQLite
+- [x] Структурированное логирование через `slog` (JSON в production)
+- [x] Bind на `127.0.0.1:PORT` (только localhost, Caddy проксирует)
 
 ### Task 7: Чтение Bear SQLite (`internal/beardb`)
 

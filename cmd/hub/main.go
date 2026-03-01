@@ -1,12 +1,127 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	_ "github.com/go-chi/chi/v5"
-	_ "modernc.org/sqlite"
+	"github.com/romancha/bear-sync/internal/api"
+	"github.com/romancha/bear-sync/internal/store"
 )
 
 func main() {
-	fmt.Println("bear-sync-hub")
+	if err := run(); err != nil {
+		slog.Error("fatal error", "error", err)
+		os.Exit(1)
+	}
+}
+
+type config struct {
+	port           string
+	dbPath         string
+	openclawToken  string
+	bridgeToken    string
+	attachmentsDir string
+}
+
+func loadConfig() (*config, error) {
+	cfg := &config{
+		port:           os.Getenv("HUB_PORT"),
+		dbPath:         os.Getenv("HUB_DB_PATH"),
+		openclawToken:  os.Getenv("HUB_OPENCLAW_TOKEN"),
+		bridgeToken:    os.Getenv("HUB_BRIDGE_TOKEN"),
+		attachmentsDir: os.Getenv("HUB_ATTACHMENTS_DIR"),
+	}
+
+	if cfg.port == "" {
+		cfg.port = "8080"
+	}
+
+	if cfg.dbPath == "" {
+		return nil, fmt.Errorf("HUB_DB_PATH is required")
+	}
+
+	if cfg.openclawToken == "" {
+		return nil, fmt.Errorf("HUB_OPENCLAW_TOKEN is required")
+	}
+
+	if cfg.bridgeToken == "" {
+		return nil, fmt.Errorf("HUB_BRIDGE_TOKEN is required")
+	}
+
+	if cfg.attachmentsDir == "" {
+		cfg.attachmentsDir = "attachments"
+	}
+
+	return cfg, nil
+}
+
+func run() error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	slog.SetDefault(slog.New(logHandler))
+
+	s, err := store.NewSQLiteStore(cfg.dbPath)
+	if err != nil {
+		return fmt.Errorf("init store: %w", err)
+	}
+	defer func() {
+		if closeErr := s.Close(); closeErr != nil {
+			slog.Error("failed to close store", "error", closeErr)
+		}
+	}()
+
+	srv := api.NewServer(s, cfg.openclawToken, cfg.bridgeToken, cfg.attachmentsDir)
+
+	addr := net.JoinHostPort("127.0.0.1", cfg.port)
+
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		slog.Info("starting hub server", "addr", addr)
+
+		if listenErr := httpServer.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("listen: %w", listenErr)
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		slog.Info("shutdown signal received")
+	case err = <-errCh:
+		return err
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err = httpServer.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("shutdown: %w", err)
+	}
+
+	slog.Info("hub server stopped")
+
+	return nil
 }
