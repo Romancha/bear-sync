@@ -46,18 +46,18 @@
 
 ### Task 4: SQLite store хаба (`internal/store`)
 
-- [ ] `store.go` — интерфейс `Store` со всеми методами (CRUD notes/tags/attachments/backlinks, FTS5 search, write_queue, sync_meta, sync/push)
-- [ ] `sqlite.go` — реализация `SQLiteStore`: инициализация БД, `PRAGMA journal_mode=WAL`, `PRAGMA busy_timeout=5000`, `PRAGMA foreign_keys=ON`
-- [ ] Миграция схемы: создание всех таблиц (notes, tags, note_tags, pinned_note_tags, attachments, backlinks, write_queue, sync_meta), индексов, FTS5 virtual table + триггеры
-- [ ] CRUD Notes: `ListNotes` (фильтры tag/trashed/encrypted, пагинация limit/offset, сортировка), `GetNote` (с тегами и бэклинками), `CreateNote`, `UpdateNote`
-- [ ] FTS5 поиск: `SearchNotes(query, tag, limit)` — поиск по title+body, опциональный фильтр по тегу
-- [ ] CRUD Tags: `ListTags`, `GetTag`, `CreateTag`
-- [ ] CRUD Attachments: `GetAttachment`, `ListAttachmentsByNote`
-- [ ] CRUD Backlinks: `ListBacklinksByNote`
-- [ ] Sync Push: `ProcessSyncPush(req SyncPushRequest)` — upsert notes/tags/attachments/backlinks по bear_id, DELETE+INSERT note_tags/pinned_note_tags (scope: note_id IN push), обработка deleted_*_ids. При `sync_status=pending_to_bear`: НЕ перезаписывать body/title
-- [ ] Write Queue: `EnqueueWrite(idempotencyKey, action, noteID, payload)` — idempotency check, `LeaseQueueItems(processingBy, leaseDuration)` — lease-based выдача (default lease 5 мин), `AckQueueItems(items []SyncAckItem)` — идемпотентный ack по idempotency_key (повторный ack — no-op), заполнение `notes.bear_id` из ack при create, expire stale leases (processing + lease_until < now → pending)
-- [ ] Sync Meta: `GetSyncMeta(key)`, `SetSyncMeta(key, value)`. Ключи: `last_sync_at`, `last_push_at`, `queue_size`, `bear_db_hash`, `initial_sync_complete`
-- [ ] Unit-тесты store: все CRUD операции, FTS5 поиск, upsert idempotency, write_queue lifecycle (enqueue → lease → ack), FK cascade delete, sync_push с pending_to_bear, lease expiry
+- [x] `store.go` — интерфейс `Store` со всеми методами (CRUD notes/tags/attachments/backlinks, FTS5 search, write_queue, sync_meta, sync/push)
+- [x] `sqlite.go` — реализация `SQLiteStore`: инициализация БД, `PRAGMA journal_mode=WAL`, `PRAGMA busy_timeout=5000`, `PRAGMA foreign_keys=ON`
+- [x] Миграция схемы: создание всех таблиц (notes, tags, note_tags, pinned_note_tags, attachments, backlinks, write_queue, sync_meta), индексов, FTS5 virtual table + триггеры
+- [x] CRUD Notes: `ListNotes` (фильтры tag/trashed/encrypted, пагинация limit/offset, сортировка), `GetNote` (с тегами и бэклинками), `CreateNote`, `UpdateNote`
+- [x] FTS5 поиск: `SearchNotes(query, tag, limit)` — поиск по title+body, опциональный фильтр по тегу
+- [x] CRUD Tags: `ListTags`, `GetTag`, `CreateTag`
+- [x] CRUD Attachments: `GetAttachment`, `ListAttachmentsByNote`
+- [x] CRUD Backlinks: `ListBacklinksByNote`
+- [x] Sync Push: `ProcessSyncPush(req SyncPushRequest)` — upsert notes/tags/attachments/backlinks по bear_id, DELETE+INSERT note_tags/pinned_note_tags (scope: note_id IN push), обработка deleted_*_ids. При `sync_status=pending_to_bear`: НЕ перезаписывать body/title
+- [x] Write Queue: `EnqueueWrite(idempotencyKey, action, noteID, payload)` — idempotency check, `LeaseQueueItems(processingBy, leaseDuration)` — lease-based выдача (default lease 5 мин), `AckQueueItems(items []SyncAckItem)` — идемпотентный ack по idempotency_key (повторный ack — no-op), заполнение `notes.bear_id` из ack при create, expire stale leases (processing + lease_until < now → pending)
+- [x] Sync Meta: `GetSyncMeta(key)`, `SetSyncMeta(key, value)`. Ключи: `last_sync_at`, `last_push_at`, `queue_size`, `bear_db_hash`, `initial_sync_complete`
+- [x] Unit-тесты store: все CRUD операции, FTS5 поиск, upsert idempotency, write_queue lifecycle (enqueue → lease → ack), FK cascade delete, sync_push с pending_to_bear, lease expiry
 
 ### Task 5: HTTP API хаба (`internal/api`)
 
