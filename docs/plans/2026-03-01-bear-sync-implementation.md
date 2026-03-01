@@ -117,16 +117,16 @@
 
 ### Task 10: Bridge main — экспорт дельт (`cmd/bridge`)
 
-- [ ] `main.go` — точка входа, чтение конфига из env (`BRIDGE_HUB_URL`, `BRIDGE_HUB_TOKEN`, `BEAR_TOKEN`, `BRIDGE_STATE_PATH`)
-- [ ] Защита от параллельного запуска: `flock(2)` через `syscall.Flock` на `~/.bear-bridge.lock` (LOCK_EX|LOCK_NB, авто-снятие при crash)
-- [ ] State management: чтение/запись `~/.bear-bridge-state.json` (`last_sync_at`, `known_note_ids`, `known_tag_ids`, `known_attachment_ids`, `known_backlink_ids`, `known_note_tag_pairs`, `known_pinned_note_tag_pairs`, `junction_full_scan_counter`)
-- [ ] Delta export: чтение изменённых сущностей из Bear SQLite по `ZMODIFICATIONDATE >= last_sync_at` (оператор `>=`, не `>` — overlap-window для защиты от потери записей на границе timestamp при clock drift; дубли безопасны — хаб делает upsert по bear_id), маппинг через mapper, формирование `SyncPushRequest`
-- [ ] Junction tables delta: для каждой изменённой заметки — полный snapshot тегов (note_tags + pinned_note_tags)
-- [ ] Junction tables full-scan: каждый 12-й цикл — полное чтение, сравнение с saved snapshot, push diff
-- [ ] Обнаружение удалений: сравнение текущих UUID с `known_*_ids`, формирование `deleted_*_ids`
-- [ ] Initial sync: если нет state-файла → батчевый push всех заметок по 50 штук. После завершения — записать `initial_sync_complete=true` в `sync_meta` хаба через push
-- [ ] Push дельты через `hubclient.SyncPush()`
-- [ ] Обновление state-файла после успешного push
+- [x] `main.go` — точка входа, чтение конфига из env (`BRIDGE_HUB_URL`, `BRIDGE_HUB_TOKEN`, `BEAR_TOKEN`, `BRIDGE_STATE_PATH`)
+- [x] Защита от параллельного запуска: `flock(2)` через `syscall.Flock` на `~/.bear-bridge.lock` (LOCK_EX|LOCK_NB, авто-снятие при crash)
+- [x] State management: чтение/запись `~/.bear-bridge-state.json` (`last_sync_at`, `known_note_ids`, `known_tag_ids`, `known_attachment_ids`, `known_backlink_ids`, `known_note_tag_pairs`, `known_pinned_note_tag_pairs`, `junction_full_scan_counter`)
+- [x] Delta export: чтение изменённых сущностей из Bear SQLite по `ZMODIFICATIONDATE >= last_sync_at` (оператор `>=`, не `>` — overlap-window для защиты от потери записей на границе timestamp при clock drift; дубли безопасны — хаб делает upsert по bear_id), маппинг через mapper, формирование `SyncPushRequest`
+- [x] Junction tables delta: для каждой изменённой заметки — полный snapshot тегов (note_tags + pinned_note_tags)
+- [x] Junction tables full-scan: каждый 12-й цикл — полное чтение, сравнение с saved snapshot, push diff
+- [x] Обнаружение удалений: сравнение текущих UUID с `known_*_ids`, формирование `deleted_*_ids`
+- [x] Initial sync: если нет state-файла → батчевый push всех заметок по 50 штук. После завершения — записать `initial_sync_complete=true` в `sync_meta` хаба через push
+- [x] Push дельты через `hubclient.SyncPush()`
+- [x] Обновление state-файла после успешного push
 
 ### Task 11: Bridge main — применение очереди записи
 

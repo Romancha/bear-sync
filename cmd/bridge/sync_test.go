@@ -1,0 +1,530 @@
+package main
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/romancha/bear-sync/internal/beardb"
+	"github.com/romancha/bear-sync/internal/hubclient"
+	"github.com/romancha/bear-sync/internal/mapper"
+	"github.com/romancha/bear-sync/internal/models"
+)
+
+// mockBearDB implements beardb.BearDB for testing.
+type mockBearDB struct {
+	notes       []mapper.BearNoteRow
+	tags        []mapper.BearTagRow
+	attachments []mapper.BearAttachmentRow
+	backlinks   []mapper.BearBacklinkRow
+	noteTags    []beardb.NoteTagPair
+	pinnedTags  []beardb.NoteTagPair
+	noteUUIDs   []string
+	tagUUIDs    []string
+	attUUIDs    []string
+	blUUIDs     []string
+}
+
+func (m *mockBearDB) Notes(_ context.Context, _ float64) ([]mapper.BearNoteRow, error) {
+	return m.notes, nil
+}
+
+func (m *mockBearDB) Tags(_ context.Context, _ float64) ([]mapper.BearTagRow, error) {
+	return m.tags, nil
+}
+
+func (m *mockBearDB) Attachments(_ context.Context, _ float64) ([]mapper.BearAttachmentRow, error) {
+	return m.attachments, nil
+}
+
+func (m *mockBearDB) Backlinks(_ context.Context, _ float64) ([]mapper.BearBacklinkRow, error) {
+	return m.backlinks, nil
+}
+
+func (m *mockBearDB) NoteTags(_ context.Context) ([]beardb.NoteTagPair, error) {
+	return m.noteTags, nil
+}
+
+func (m *mockBearDB) PinnedNoteTags(_ context.Context) ([]beardb.NoteTagPair, error) {
+	return m.pinnedTags, nil
+}
+
+func (m *mockBearDB) NoteTagsForNotes(_ context.Context, noteUUIDs []string) ([]beardb.NoteTagPair, error) {
+	noteSet := make(map[string]bool, len(noteUUIDs))
+	for _, u := range noteUUIDs {
+		noteSet[u] = true
+	}
+	var result []beardb.NoteTagPair
+	for _, p := range m.noteTags {
+		if noteSet[p.NoteUUID] {
+			result = append(result, p)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockBearDB) PinnedNoteTagsForNotes(_ context.Context, noteUUIDs []string) ([]beardb.NoteTagPair, error) {
+	noteSet := make(map[string]bool, len(noteUUIDs))
+	for _, u := range noteUUIDs {
+		noteSet[u] = true
+	}
+	var result []beardb.NoteTagPair
+	for _, p := range m.pinnedTags {
+		if noteSet[p.NoteUUID] {
+			result = append(result, p)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockBearDB) AllNoteUUIDs(_ context.Context) ([]string, error)       { return m.noteUUIDs, nil }
+func (m *mockBearDB) AllTagUUIDs(_ context.Context) ([]string, error)        { return m.tagUUIDs, nil }
+func (m *mockBearDB) AllAttachmentUUIDs(_ context.Context) ([]string, error) { return m.attUUIDs, nil }
+func (m *mockBearDB) AllBacklinkUUIDs(_ context.Context) ([]string, error)   { return m.blUUIDs, nil }
+func (m *mockBearDB) Close() error                                           { return nil }
+
+// mockHubClient implements hubclient.HubClient for testing.
+type mockHubClient struct {
+	pushes []models.SyncPushRequest
+}
+
+func (m *mockHubClient) SyncPush(_ context.Context, req models.SyncPushRequest) error { //nolint:gocritic // interface match
+	m.pushes = append(m.pushes, req)
+	return nil
+}
+
+func (m *mockHubClient) LeaseQueue(_ context.Context, _ string) ([]models.WriteQueueItem, error) {
+	return nil, nil
+}
+
+func (m *mockHubClient) AckQueue(_ context.Context, _ []models.SyncAckItem) error {
+	return nil
+}
+
+func (m *mockHubClient) UploadAttachment(_ context.Context, _ string, _ io.Reader) error {
+	return nil
+}
+
+func (m *mockHubClient) GetSyncStatus(_ context.Context) (*hubclient.SyncStatus, error) {
+	return nil, nil
+}
+
+func strPtr(s string) *string    { return &s }
+func floatPtr(f float64) *float64 { return &f }
+
+func TestInitialSync(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	db := &mockBearDB{
+		notes: []mapper.BearNoteRow{
+			{ZPK: 1, ZUNIQUEIDENTIFIER: strPtr("note-1"), ZTITLE: strPtr("Note 1"), ZMODIFICATIONDATE: floatPtr(100)},
+			{ZPK: 2, ZUNIQUEIDENTIFIER: strPtr("note-2"), ZTITLE: strPtr("Note 2"), ZMODIFICATIONDATE: floatPtr(200)},
+		},
+		tags: []mapper.BearTagRow{
+			{ZPK: 1, ZUNIQUEIDENTIFIER: strPtr("tag-1"), ZTITLE: strPtr("Tag 1")},
+		},
+		noteTags: []beardb.NoteTagPair{
+			{NoteUUID: "note-1", TagUUID: "tag-1"},
+		},
+		noteUUIDs: []string{"note-1", "note-2"},
+		tagUUIDs:  []string{"tag-1"},
+	}
+
+	hub := &mockHubClient{}
+	logger := testLogger()
+	bridge := NewBridge(db, hub, statePath, logger)
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	// Should have pushed: 1 batch for tags/attachments/backlinks + 1 batch for notes (2 < 50).
+	require.Len(t, hub.pushes, 2)
+
+	// First push: tags + junction tables.
+	assert.Len(t, hub.pushes[0].Tags, 1)
+	assert.Len(t, hub.pushes[0].NoteTags, 1)
+
+	// Second push: notes.
+	assert.Len(t, hub.pushes[1].Notes, 2)
+
+	// State file should exist.
+	state, err := loadState(statePath)
+	require.NoError(t, err)
+	require.NotNil(t, state)
+	assert.Greater(t, state.LastSyncAt, float64(0))
+	assert.Len(t, state.KnownNoteIDs, 2)
+	assert.Len(t, state.KnownTagIDs, 1)
+	assert.Len(t, state.KnownNoteTagPairs, 1)
+}
+
+func TestInitialSync_BatchedNotes(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Create 120 notes to test batching (50 per batch = 3 batches).
+	notes := make([]mapper.BearNoteRow, 120)
+	noteUUIDs := make([]string, 120)
+	for i := range 120 {
+		uuid := "note-" + string(rune('A'+i%26)) + string(rune('0'+i/26))
+		notes[i] = mapper.BearNoteRow{
+			ZPK:               int64(i + 1),
+			ZUNIQUEIDENTIFIER: strPtr(uuid),
+			ZTITLE:            strPtr("Note " + uuid),
+		}
+		noteUUIDs[i] = uuid
+	}
+
+	db := &mockBearDB{
+		notes:     notes,
+		noteUUIDs: noteUUIDs,
+	}
+	hub := &mockHubClient{}
+	bridge := NewBridge(db, hub, filepath.Join(tmpDir, "state.json"), testLogger())
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	// No tags/attachments/backlinks, so no initial batch, just 3 note batches.
+	require.Len(t, hub.pushes, 3)
+	assert.Len(t, hub.pushes[0].Notes, 50)
+	assert.Len(t, hub.pushes[1].Notes, 50)
+	assert.Len(t, hub.pushes[2].Notes, 20)
+
+	state, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Len(t, state.KnownNoteIDs, 120)
+}
+
+func TestDeltaSync_NoChanges(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Pre-create state (simulating previous sync).
+	state := &BridgeState{
+		LastSyncAt:   100,
+		KnownNoteIDs: []string{"note-1"},
+		KnownTagIDs:  []string{"tag-1"},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	db := &mockBearDB{
+		noteUUIDs: []string{"note-1"},
+		tagUUIDs:  []string{"tag-1"},
+	}
+	hub := &mockHubClient{}
+	bridge := NewBridge(db, hub, statePath, testLogger())
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	// No changes detected — no push should happen.
+	assert.Empty(t, hub.pushes)
+
+	// Counter should increment.
+	updatedState, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, 1, updatedState.JunctionFullScanCounter)
+}
+
+func TestDeltaSync_WithChanges(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	state := &BridgeState{
+		LastSyncAt:   100,
+		KnownNoteIDs: []string{"note-1"},
+		KnownTagIDs:  []string{"tag-1"},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	db := &mockBearDB{
+		notes: []mapper.BearNoteRow{
+			{ZPK: 2, ZUNIQUEIDENTIFIER: strPtr("note-2"), ZTITLE: strPtr("New Note"), ZMODIFICATIONDATE: floatPtr(150)},
+		},
+		noteTags: []beardb.NoteTagPair{
+			{NoteUUID: "note-2", TagUUID: "tag-1"},
+		},
+		noteUUIDs: []string{"note-1", "note-2"},
+		tagUUIDs:  []string{"tag-1"},
+	}
+	hub := &mockHubClient{}
+	bridge := NewBridge(db, hub, statePath, testLogger())
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, hub.pushes, 1)
+	assert.Len(t, hub.pushes[0].Notes, 1)
+	assert.Len(t, hub.pushes[0].NoteTags, 1) // Junction delta for changed note.
+
+	updatedState, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Greater(t, updatedState.LastSyncAt, state.LastSyncAt)
+	assert.Len(t, updatedState.KnownNoteIDs, 2)
+}
+
+func TestDeltaSync_DeletionDetection(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	state := &BridgeState{
+		LastSyncAt:         100,
+		KnownNoteIDs:       []string{"note-1", "note-2", "note-3"},
+		KnownTagIDs:        []string{"tag-1", "tag-2"},
+		KnownAttachmentIDs: []string{"att-1"},
+		KnownBacklinkIDs:   []string{"bl-1"},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	// note-2 and tag-2 have been deleted from Bear.
+	db := &mockBearDB{
+		noteUUIDs: []string{"note-1", "note-3"},
+		tagUUIDs:  []string{"tag-1"},
+		attUUIDs:  []string{"att-1"},
+		blUUIDs:   []string{"bl-1"},
+	}
+	hub := &mockHubClient{}
+	bridge := NewBridge(db, hub, statePath, testLogger())
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, hub.pushes, 1)
+	assert.Equal(t, []string{"note-2"}, hub.pushes[0].DeletedNoteIDs)
+	assert.Equal(t, []string{"tag-2"}, hub.pushes[0].DeletedTagIDs)
+	assert.Empty(t, hub.pushes[0].DeletedAttachmentIDs)
+	assert.Empty(t, hub.pushes[0].DeletedBacklinkIDs)
+}
+
+func TestDeltaSync_JunctionFullScan(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Counter at 12 — triggers full scan.
+	state := &BridgeState{
+		LastSyncAt:              100,
+		KnownNoteIDs:            []string{"note-1"},
+		KnownTagIDs:             []string{"tag-1", "tag-2"},
+		JunctionFullScanCounter: 12,
+		KnownNoteTagPairs: []IDPair{
+			{NoteUUID: "note-1", TagUUID: "tag-1"},
+		},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	// Tag-2 was added to note-1 without modifying the note itself (no delta rows).
+	db := &mockBearDB{
+		noteTags: []beardb.NoteTagPair{
+			{NoteUUID: "note-1", TagUUID: "tag-1"},
+			{NoteUUID: "note-1", TagUUID: "tag-2"},
+		},
+		noteUUIDs: []string{"note-1"},
+		tagUUIDs:  []string{"tag-1", "tag-2"},
+	}
+	hub := &mockHubClient{}
+	bridge := NewBridge(db, hub, statePath, testLogger())
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, hub.pushes, 1)
+	// Full scan detected the new tag-2 association.
+	assert.Len(t, hub.pushes[0].NoteTags, 2) // Full snapshot for note-1.
+
+	updatedState, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, 13, updatedState.JunctionFullScanCounter)
+	assert.Len(t, updatedState.KnownNoteTagPairs, 2)
+}
+
+func TestDeltaSync_NoFullScanOnNonInterval(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	state := &BridgeState{
+		LastSyncAt:              100,
+		KnownNoteIDs:            []string{"note-1"},
+		KnownTagIDs:             []string{"tag-1", "tag-2"},
+		JunctionFullScanCounter: 5, // Not a multiple of 12.
+		KnownNoteTagPairs: []IDPair{
+			{NoteUUID: "note-1", TagUUID: "tag-1"},
+		},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	db := &mockBearDB{
+		noteTags: []beardb.NoteTagPair{
+			{NoteUUID: "note-1", TagUUID: "tag-1"},
+			{NoteUUID: "note-1", TagUUID: "tag-2"}, // Changed but won't be detected.
+		},
+		noteUUIDs: []string{"note-1"},
+		tagUUIDs:  []string{"tag-1", "tag-2"},
+	}
+	hub := &mockHubClient{}
+	bridge := NewBridge(db, hub, statePath, testLogger())
+
+	err := bridge.Run(context.Background())
+	require.NoError(t, err)
+
+	// No entity changes, no full scan -> no push.
+	assert.Empty(t, hub.pushes)
+}
+
+func TestFindChangedJunctionNotes(t *testing.T) {
+	tests := []struct {
+		name     string
+		old      []IDPair
+		new      []IDPair
+		expected int
+	}{
+		{
+			name:     "no changes",
+			old:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}},
+			new:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}},
+			expected: 0,
+		},
+		{
+			name:     "tag added",
+			old:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}},
+			new:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}, {NoteUUID: "n1", TagUUID: "t2"}},
+			expected: 1,
+		},
+		{
+			name:     "tag removed",
+			old:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}, {NoteUUID: "n1", TagUUID: "t2"}},
+			new:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}},
+			expected: 1,
+		},
+		{
+			name:     "new note",
+			old:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}},
+			new:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}, {NoteUUID: "n2", TagUUID: "t1"}},
+			expected: 1,
+		},
+		{
+			name:     "note removed",
+			old:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}, {NoteUUID: "n2", TagUUID: "t1"}},
+			new:      []IDPair{{NoteUUID: "n1", TagUUID: "t1"}},
+			expected: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := findChangedJunctionNotes(tt.old, tt.new)
+			assert.Len(t, result, tt.expected)
+		})
+	}
+}
+
+func TestStateRoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	state := &BridgeState{
+		LastSyncAt:              123.456,
+		KnownNoteIDs:            []string{"note-1", "note-2"},
+		KnownTagIDs:             []string{"tag-1"},
+		KnownAttachmentIDs:      []string{"att-1"},
+		KnownBacklinkIDs:        []string{"bl-1"},
+		KnownNoteTagPairs:       []IDPair{{NoteUUID: "note-1", TagUUID: "tag-1"}},
+		KnownPinnedNoteTagPairs: []IDPair{{NoteUUID: "note-2", TagUUID: "tag-1"}},
+		JunctionFullScanCounter: 7,
+	}
+
+	require.NoError(t, saveState(statePath, state))
+
+	loaded, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, state, loaded)
+}
+
+func TestLoadState_NotExists(t *testing.T) {
+	state, err := loadState("/nonexistent/path/state.json")
+	require.NoError(t, err)
+	assert.Nil(t, state)
+}
+
+func TestFlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockPath := filepath.Join(tmpDir, "test.lock")
+
+	// First lock should succeed.
+	f1, err := acquireLock(lockPath)
+	require.NoError(t, err)
+	require.NotNil(t, f1)
+
+	// Second lock should fail.
+	_, err = acquireLock(lockPath)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "another bridge instance is running")
+
+	// After release, should be able to lock again.
+	releaseLock(f1, testLogger())
+
+	f2, err := acquireLock(lockPath)
+	require.NoError(t, err)
+	require.NotNil(t, f2)
+	releaseLock(f2, testLogger())
+}
+
+func TestIsEmptyPush(t *testing.T) {
+	assert.True(t, isEmptyPush(&models.SyncPushRequest{}))
+	assert.False(t, isEmptyPush(&models.SyncPushRequest{
+		Notes: []models.Note{{ID: "1"}},
+	}))
+	assert.False(t, isEmptyPush(&models.SyncPushRequest{
+		DeletedNoteIDs: []string{"1"},
+	}))
+}
+
+func TestMergeNoteTags(t *testing.T) {
+	existing := []models.NoteTagPair{
+		{NoteID: "n1", TagID: "t1"},
+	}
+	additional := []models.NoteTagPair{
+		{NoteID: "n1", TagID: "t1"}, // Duplicate.
+		{NoteID: "n2", TagID: "t1"}, // New.
+	}
+
+	result := mergeNoteTags(existing, additional)
+	assert.Len(t, result, 2)
+}
+
+func TestLoadConfig_MissingRequired(t *testing.T) {
+	// Clear all env vars.
+	t.Setenv("BRIDGE_HUB_URL", "")
+	t.Setenv("BRIDGE_HUB_TOKEN", "")
+	t.Setenv("BEAR_TOKEN", "")
+
+	_, err := loadConfig()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "BRIDGE_HUB_URL")
+}
+
+func TestLoadConfig_AllSet(t *testing.T) {
+	t.Setenv("BRIDGE_HUB_URL", "http://localhost:8080")
+	t.Setenv("BRIDGE_HUB_TOKEN", "test-token")
+	t.Setenv("BEAR_TOKEN", "bear-token")
+	t.Setenv("BRIDGE_STATE_PATH", "/tmp/test-state.json")
+	t.Setenv("BEAR_DB_DIR", "/tmp/test-bear-db")
+
+	cfg, err := loadConfig()
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:8080", cfg.hubURL)
+	assert.Equal(t, "test-token", cfg.hubToken)
+	assert.Equal(t, "bear-token", cfg.bearToken)
+	assert.Equal(t, "/tmp/test-state.json", cfg.statePath)
+	assert.Equal(t, "/tmp/test-bear-db", cfg.bearDBDir)
+}
+
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+}
