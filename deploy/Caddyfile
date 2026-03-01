@@ -1,0 +1,28 @@
+bear-sync.example.com {
+	# Rate limiting: openclaw 60 req/min, bridge 120 req/min
+	# Requires caddy-ratelimit plugin: https://github.com/mholt/caddy-ratelimit
+	rate_limit {
+		zone openclaw_zone {
+			match {
+				path /api/*
+			}
+			key {remote_host}
+			events 60
+			window 1m
+		}
+		zone bridge_zone {
+			match {
+				path /api/sync/*
+			}
+			key {remote_host}
+			events 120
+			window 1m
+		}
+	}
+
+	reverse_proxy 127.0.0.1:8080
+
+	log {
+		output file /var/log/caddy/bear-sync.log
+	}
+}

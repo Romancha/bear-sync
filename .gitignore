@@ -1,6 +1,11 @@
 bin/
 coverage.out
 coverage.html
+*.db
+*.db-wal
+*.db-shm
+.bear-bridge-state.json
+.bear-bridge.lock
 
 # ralphex progress logs
 .ralphex/progress/

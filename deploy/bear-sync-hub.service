@@ -1,0 +1,24 @@
+[Unit]
+Description=Bear Sync Hub API Server
+After=network.target
+
+[Service]
+Type=simple
+User=bear-sync
+Group=bear-sync
+WorkingDirectory=/opt/bear-sync
+ExecStart=/opt/bear-sync/bin/hub
+Restart=on-failure
+RestartSec=5
+
+EnvironmentFile=/opt/bear-sync/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bear-sync/data /opt/bear-sync/attachments
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -167,11 +167,11 @@
 
 ### Task 15: Деплой и конфигурация
 
-- [ ] Systemd unit для hub (`bear-sync-hub.service`): Environment file, restart on failure, after=network.target
-- [ ] Launchd plist для bridge (`com.romancha.bear-bridge.plist`): StartInterval 300 (5 мин), env variables
-- [ ] Caddyfile: reverse proxy с TLS (Let's Encrypt), rate limiting (60 req/min openclaw, 120 req/min bridge)
-- [ ] `.gitignore` — бинарники, .db файлы, state файлы, coverage отчёты
-- [ ] Документация в README: установка, конфигурация env-переменных, запуск
+- [x] Systemd unit для hub (`bear-sync-hub.service`): Environment file, restart on failure, after=network.target
+- [x] Launchd plist для bridge (`com.romancha.bear-bridge.plist`): StartInterval 300 (5 мин), env variables
+- [x] Caddyfile: reverse proxy с TLS (Let's Encrypt), rate limiting (60 req/min openclaw, 120 req/min bridge)
+- [x] `.gitignore` — бинарники, .db файлы, state файлы, coverage отчёты
+- [x] Документация в README: установка, конфигурация env-переменных, запуск
 
 ### Task 16: Финальная сверка с дизайн-документом
 

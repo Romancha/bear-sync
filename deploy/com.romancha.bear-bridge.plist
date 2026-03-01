@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.romancha.bear-bridge</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/local/bin/bear-bridge</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>300</integer>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>BRIDGE_HUB_URL</key>
+		<string>https://bear-sync.example.com</string>
+		<key>BRIDGE_HUB_TOKEN</key>
+		<string>CHANGEME</string>
+		<key>BEAR_TOKEN</key>
+		<string>CHANGEME</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/tmp/bear-bridge.stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/bear-bridge.stderr.log</string>
+	<key>RunAtLoad</key>
+	<true/>
+</dict>
+</plist>
