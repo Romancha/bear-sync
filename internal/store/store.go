@@ -25,6 +25,7 @@ type Store interface {
 	GetNote(ctx context.Context, id string) (*models.Note, error)
 	CreateNote(ctx context.Context, note *models.Note) error
 	UpdateNote(ctx context.Context, note *models.Note) error
+	DeleteNote(ctx context.Context, id string) error
 
 	// FTS5 search
 	SearchNotes(ctx context.Context, query string, tag string, limit int) ([]models.Note, error)
@@ -47,6 +48,7 @@ type Store interface {
 	ProcessSyncPush(ctx context.Context, req models.SyncPushRequest) error
 
 	// Write Queue
+	GetQueueItemByIdempotencyKey(ctx context.Context, key string) (*models.WriteQueueItem, error)
 	EnqueueWrite(ctx context.Context, idempotencyKey, action, noteID, payload string) (*models.WriteQueueItem, error)
 	LeaseQueueItems(ctx context.Context, processingBy string, leaseDuration time.Duration) ([]models.WriteQueueItem, error)
 	AckQueueItems(ctx context.Context, items []models.SyncAckItem) error

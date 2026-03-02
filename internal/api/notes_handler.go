@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,11 +32,17 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 
 	if v := r.URL.Query().Get("limit"); v != "" {
 		n, _ := strconv.Atoi(v)
+		if n > 200 {
+			n = 200
+		}
 		filter.Limit = n
 	}
 
 	if v := r.URL.Query().Get("offset"); v != "" {
 		n, _ := strconv.Atoi(v)
+		if n < 0 {
+			n = 0
+		}
 		filter.Offset = n
 	}
 
@@ -71,6 +78,9 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 		n, _ := strconv.Atoi(v)
 		if n > 0 {
 			limit = n
+		}
+		if limit > 200 {
+			limit = 200
 		}
 	}
 
@@ -123,6 +133,23 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idempotencyKey := r.Header.Get("Idempotency-Key")
+
+	// Check idempotency before creating the note to prevent duplicate notes on retries.
+	// Skip early return for failed items so the caller can retry a previously failed enqueue.
+	if idempotencyKey != "" {
+		existing, err := s.store.GetQueueItemByIdempotencyKey(r.Context(), idempotencyKey)
+		if isRetryableQueueItem(existing, err) {
+			note, _ := s.store.GetNote(r.Context(), existing.NoteID) //nolint:errcheck // best-effort lookup
+			if note != nil {
+				writeJSON(w, http.StatusCreated, note)
+			} else {
+				// Queue item exists but note lookup failed — still return success to avoid duplicates.
+				writeJSON(w, http.StatusCreated, map[string]string{"id": existing.NoteID, "status": "accepted"})
+			}
+			return
+		}
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	payload, _ := json.Marshal(req) //nolint:errcheck // marshaling a simple struct cannot fail
@@ -145,6 +172,11 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.EnqueueWrite(
 		r.Context(), idempotencyKey, "create", note.ID, string(payload),
 	); err != nil {
+		// Compensate: delete the orphaned note to avoid a stuck pending_to_bear record.
+		if delErr := s.store.DeleteNote(r.Context(), note.ID); delErr != nil {
+			slog.Error("failed to delete orphaned note after enqueue failure", //nolint:gosec // G706: note_id is generated UUID, not user input
+				"note_id", note.ID, "enqueue_error", err.Error(), "delete_error", delErr.Error())
+		}
 		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
 		return
 	}
@@ -176,14 +208,46 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if note.BearID == nil || *note.BearID == "" {
+		writeError(w, http.StatusConflict, "note not yet synced to Bear; retry after initial sync completes")
+		return
+	}
+
+	if note.SyncStatus == syncStatusConflict {
+		writeError(w, http.StatusConflict, "note has unresolved conflicts; resolve conflicts before updating")
+		return
+	}
+
 	var req updateNoteRequest
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
+	if req.Body == "" {
+		writeError(w, http.StatusBadRequest, "body is required (title-only updates are not supported)")
+		return
+	}
+
 	idempotencyKey := r.Header.Get("Idempotency-Key")
+
+	// Check idempotency before mutating to prevent timestamp re-bumping on retries.
+	// Skip early return for failed items so the caller can retry a previously failed enqueue.
+	if idempotencyKey != "" {
+		existing, err := s.store.GetQueueItemByIdempotencyKey(r.Context(), idempotencyKey)
+		if isRetryableQueueItem(existing, err) {
+			writeJSON(w, http.StatusOK, note)
+			return
+		}
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
+
+	// Save original state for rollback if enqueue fails.
+	oldTitle := note.Title
+	oldBody := note.Body
+	oldSyncStatus := note.SyncStatus
+	oldHubModifiedAt := note.HubModifiedAt
 
 	if req.Title != "" {
 		note.Title = req.Title
@@ -195,7 +259,8 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 
 	note.SyncStatus = "pending_to_bear"
 	note.HubModifiedAt = now
-	note.ModifiedAt = now
+	// Do NOT overwrite ModifiedAt here — it must retain the Bear-sourced value
+	// so that conflict detection in updateExistingNote can compare correctly.
 
 	if err := s.store.UpdateNote(r.Context(), note); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update note")
@@ -218,6 +283,14 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.EnqueueWrite(
 		r.Context(), idempotencyKey, "update", note.ID, string(payload),
 	); err != nil {
+		// Restore original note state to avoid permanently stuck pending_to_bear.
+		note.Title = oldTitle
+		note.Body = oldBody
+		note.SyncStatus = oldSyncStatus
+		note.HubModifiedAt = oldHubModifiedAt
+		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
+			logNoteRestoreError(note.ID, err, restoreErr)
+		}
 		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
 		return
 	}
@@ -244,8 +317,35 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if note.BearID == nil || *note.BearID == "" {
+		writeError(w, http.StatusConflict, "note not yet synced to Bear; retry after initial sync completes")
+		return
+	}
+
+	if note.SyncStatus == syncStatusConflict {
+		writeError(w, http.StatusConflict, "note has unresolved conflicts; resolve conflicts before trashing")
+		return
+	}
+
 	idempotencyKey := r.Header.Get("Idempotency-Key")
+
+	// Check idempotency before mutating to prevent timestamp re-bumping on retries.
+	// Skip early return for failed items so the caller can retry a previously failed enqueue.
+	if idempotencyKey != "" {
+		existing, err := s.store.GetQueueItemByIdempotencyKey(r.Context(), idempotencyKey)
+		if isRetryableQueueItem(existing, err) {
+			writeJSON(w, http.StatusOK, note)
+			return
+		}
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
+
+	// Save original state for rollback if enqueue fails.
+	oldTrashed := note.Trashed
+	oldTrashedAt := note.TrashedAt
+	oldSyncStatus := note.SyncStatus
+	oldHubModifiedAt := note.HubModifiedAt
 
 	note.Trashed = 1
 	note.TrashedAt = now
@@ -267,9 +367,29 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.EnqueueWrite(
 		r.Context(), idempotencyKey, "trash", note.ID, string(payload),
 	); err != nil {
+		// Restore original note state to avoid permanently stuck pending_to_bear.
+		note.Trashed = oldTrashed
+		note.TrashedAt = oldTrashedAt
+		note.SyncStatus = oldSyncStatus
+		note.HubModifiedAt = oldHubModifiedAt
+		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
+			logNoteRestoreError(note.ID, err, restoreErr)
+		}
 		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, note)
+}
+
+// isRetryableQueueItem returns true if an existing queue item for this idempotency key
+// should short-circuit the handler. Failed items return false so callers can retry.
+func isRetryableQueueItem(item *models.WriteQueueItem, err error) bool {
+	return err == nil && item != nil && item.Status != "failed"
+}
+
+// logNoteRestoreError logs when a note state rollback fails after an enqueue error.
+func logNoteRestoreError(noteID string, enqueueErr, restoreErr error) {
+	slog.Error("failed to restore note state after enqueue failure", //nolint:gosec // G706: error strings are internal
+		"note_id", noteID, "enqueue_error", enqueueErr.Error(), "restore_error", restoreErr.Error())
 }

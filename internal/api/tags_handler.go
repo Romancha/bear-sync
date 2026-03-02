@@ -46,6 +46,16 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if note.BearID == nil || *note.BearID == "" {
+		writeError(w, http.StatusConflict, "note not yet synced to Bear; retry after initial sync completes")
+		return
+	}
+
+	if note.SyncStatus == syncStatusConflict {
+		writeError(w, http.StatusConflict, "note has unresolved conflicts; resolve conflicts before updating")
+		return
+	}
+
 	var req addTagRequest
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")

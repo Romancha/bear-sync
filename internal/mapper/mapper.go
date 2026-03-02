@@ -10,9 +10,9 @@ import (
 	"github.com/romancha/bear-sync/internal/models"
 )
 
-// coreDataEpochOffset is the difference in seconds between Unix epoch (1970-01-01)
+// CoreDataEpochOffset is the difference in seconds between Unix epoch (1970-01-01)
 // and Core Data epoch (2001-01-01).
-const coreDataEpochOffset = 978307200
+const CoreDataEpochOffset = 978307200
 
 // BearNoteRow represents a raw row from Bear's ZSFNOTE table.
 type BearNoteRow struct {
@@ -138,7 +138,7 @@ func ConvertCoreDataDate(ts *float64) string {
 		return ""
 	}
 
-	unixSec := int64(*ts) + coreDataEpochOffset
+	unixSec := int64(*ts) + CoreDataEpochOffset
 	nsec := int64((*ts - float64(int64(*ts))) * 1e9)
 
 	return time.Unix(unixSec, nsec).UTC().Format(time.RFC3339)

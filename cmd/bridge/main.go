@@ -145,18 +145,15 @@ func acquireLock(path string) (*os.File, error) {
 	return f, nil
 }
 
-// releaseLock releases the file lock and removes the lock file.
+// releaseLock releases the file lock. The lock file is intentionally kept on disk
+// to avoid a TOCTOU race between concurrent bridge instances. The OS automatically
+// releases the flock when the process exits.
 func releaseLock(f *os.File, logger *slog.Logger) {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_UN); err != nil { //nolint:gosec // fd fits int on darwin
 		logger.Warn("failed to unlock", "error", err)
 	}
 
-	name := f.Name()
 	if err := f.Close(); err != nil {
 		logger.Warn("failed to close lock file", "error", err)
-	}
-
-	if err := os.Remove(name); err != nil { //nolint:gosec // lock file path from trusted config
-		logger.Warn("failed to remove lock file", "error", err)
 	}
 }

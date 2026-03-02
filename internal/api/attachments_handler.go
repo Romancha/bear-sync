@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -34,5 +35,7 @@ func (s *Server) getAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sanitized := strings.NewReplacer(`"`, `_`, "\r", "", "\n", "").Replace(filename)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitized+`"`)
 	http.ServeFile(w, r, filePath)
 }

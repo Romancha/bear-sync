@@ -15,9 +15,6 @@ import (
 	"github.com/romancha/bear-sync/internal/xcallback"
 )
 
-// coreDataEpochOffset is the difference between Unix epoch and Core Data epoch.
-const coreDataEpochOffset = 978307200
-
 // junctionFullScanInterval determines how often a full junction table scan is performed.
 const junctionFullScanInterval = 12
 
@@ -235,6 +232,13 @@ func (b *Bridge) deltaSync(ctx context.Context, state *BridgeState) error {
 		return nil
 	}
 
+	// Include the sync timestamp in meta so the hub's sync/status endpoint reflects it.
+	now := currentCoreDataEpoch()
+	if req.Meta == nil {
+		req.Meta = map[string]string{}
+	}
+	req.Meta["last_sync_at"] = time.Now().UTC().Format(time.RFC3339)
+
 	if err := b.hub.SyncPush(ctx, *req); err != nil {
 		return fmt.Errorf("push delta: %w", err)
 	}
@@ -245,7 +249,6 @@ func (b *Bridge) deltaSync(ctx context.Context, state *BridgeState) error {
 	}
 
 	// Update state after successful push.
-	now := currentCoreDataEpoch()
 	state.LastSyncAt = now
 	state.JunctionFullScanCounter++
 
@@ -403,27 +406,46 @@ func (b *Bridge) junctionFullScan(
 	state.KnownPinnedNoteTagPairs = convertToIDPairs(currentPinnedNoteTags)
 
 	// Build full tag snapshots for affected notes.
+	// For notes with zero remaining tags, include a sentinel pair (empty TagID)
+	// so that replaceNoteTags will still resolve the note and delete its old tags.
 	var noteTagResults []models.NoteTagPair
 	for _, noteUUID := range changedNoteTagNotes {
+		found := false
 		for _, pair := range currentNoteTags {
 			if pair.NoteUUID == noteUUID {
 				noteTagResults = append(noteTagResults, models.NoteTagPair{
 					NoteID: pair.NoteUUID,
 					TagID:  pair.TagUUID,
 				})
+				found = true
 			}
+		}
+		if !found {
+			// Note lost all tags — sentinel pair triggers tag deletion in replaceNoteTags.
+			noteTagResults = append(noteTagResults, models.NoteTagPair{
+				NoteID: noteUUID,
+				TagID:  "",
+			})
 		}
 	}
 
 	var pinnedTagResults []models.NoteTagPair
 	for _, noteUUID := range changedPinnedNotes {
+		found := false
 		for _, pair := range currentPinnedNoteTags {
 			if pair.NoteUUID == noteUUID {
 				pinnedTagResults = append(pinnedTagResults, models.NoteTagPair{
 					NoteID: pair.NoteUUID,
 					TagID:  pair.TagUUID,
 				})
+				found = true
 			}
+		}
+		if !found {
+			pinnedTagResults = append(pinnedTagResults, models.NoteTagPair{
+				NoteID: noteUUID,
+				TagID:  "",
+			})
 		}
 	}
 
@@ -573,7 +595,9 @@ func (b *Bridge) uploadAttachmentModels(ctx context.Context, attachments []model
 			continue
 		}
 
-		if err := b.uploadSingleAttachment(ctx, att.ID, filePath); err != nil {
+		// Use bear_id for uploads: the hub resolves by bear_id since mapper-generated IDs
+		// are ephemeral and may not match the hub's assigned ID after upsert.
+		if err := b.uploadSingleAttachment(ctx, *att.BearID, filePath); err != nil {
 			b.logger.Warn("failed to upload attachment file",
 				"attachment_id", att.ID, "bear_id", *att.BearID, "path", filePath, "error", err)
 		}
@@ -586,7 +610,7 @@ func (b *Bridge) resolveAttachmentFilePath(attType, bearID, filename string) str
 	var subdir string
 
 	switch attType {
-	case "image":
+	case "image", "video":
 		subdir = "Note Images"
 	default:
 		subdir = "Note Files"
@@ -780,5 +804,5 @@ func isEmptyPush(req *models.SyncPushRequest) bool {
 }
 
 func currentCoreDataEpoch() float64 {
-	return float64(time.Now().Unix() - coreDataEpochOffset)
+	return float64(time.Now().Unix() - mapper.CoreDataEpochOffset)
 }

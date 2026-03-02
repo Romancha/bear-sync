@@ -148,7 +148,9 @@ func (b *Bridge) handleConflictItem(ctx context.Context, item *models.WriteQueue
 	}
 
 	ack.Status = "applied"
-	ack.BearID = bearID
+	ack.ConflictResolved = true
+	// Do not set ack.BearID here: bearID is for the new conflict copy note, not the original.
+	// Setting it would overwrite the original note's bear_id in the hub, breaking the dual-ID mapping.
 	b.logger.Info("conflict note created",
 		"queue_id", item.ID, "conflict_bear_id", bearID, "conflict_title", conflictTitle)
 }
@@ -168,20 +170,12 @@ func (b *Bridge) extractConflictContent(ctx context.Context, item *models.WriteQ
 		body = bd
 	}
 
-	// If no title in payload, try to get it from the original Bear note.
-	if title == "" && item.NoteID != "" {
-		note, err := b.db.NoteByUUID(ctx, item.NoteID)
-		if err == nil && note != nil {
-			title = note.Title
-		}
-
-		// Also try bear_id from payload.
-		if title == "" {
-			if bearID, ok := payloadMap["bear_id"].(string); ok && bearID != "" {
-				note, err := b.db.NoteByUUID(ctx, bearID)
-				if err == nil && note != nil {
-					title = note.Title
-				}
+	// If no title in payload, try to get it from the original Bear note using bear_id.
+	if title == "" {
+		if bearID, ok := payloadMap["bear_id"].(string); ok && bearID != "" {
+			note, err := b.db.NoteByUUID(ctx, bearID)
+			if err == nil && note != nil {
+				title = note.Title
 			}
 		}
 	}
@@ -222,9 +216,11 @@ func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (
 	// Fallback verification: xcall didn't return a UUID.
 	b.logger.Warn("xcall create returned empty identifier, attempting fallback verification")
 
-	b.sleepFn(verifyDelay)
-
+	// Capture the baseline epoch BEFORE sleeping so the search window covers the time
+	// when the note was actually created, not after the sleep has elapsed.
 	createdAfter := currentCoreDataEpoch() - createFallbackWindow
+
+	b.sleepFn(verifyDelay)
 	matches, err := b.db.FindRecentNotesByTitle(ctx, payload.Title, createdAfter)
 	if err != nil {
 		return "", fmt.Errorf("fallback search: %w", err)

@@ -13,6 +13,7 @@ Monorepo with two Go binaries for syncing Bear notes with openclaw.
 - internal/store/ — SQLite store for hub (hub only)
 - internal/api/ — HTTP handlers with chi router (hub only)
 - internal/xcallback/ — Bear x-callback-url executor via xcall CLI (bridge only)
+- deploy/ — deployment configs (systemd unit, launchd plist, Caddyfile)
 - testdata/ — test fixtures (test Bear SQLite)
 
 ## Commands
@@ -56,3 +57,24 @@ Monorepo with two Go binaries for syncing Bear notes with openclaw.
 
 - Two Bearer tokens: one for openclaw (api/* scope), one for bridge (sync/* scope)
 - Encrypted notes are read-only (403 for write operations)
+- All mutating openclaw API requests (POST/PUT/DELETE) require an `Idempotency-Key` header; missing header returns HTTP 400
+
+## Note sync_status lifecycle
+
+- `synced`: normal state; Bear delta pushes overwrite hub fields freely
+- `pending_to_bear`: openclaw has enqueued a write; hub will NOT overwrite `title`/`body` from Bear delta pushes while in this state
+- `conflict`: set when a Bear push arrives for a `pending_to_bear` note with a newer `modified_at`; bridge creates a `[Conflict] Title` note in Bear instead of applying the queue item
+- Transitions: `synced` → `pending_to_bear` (on enqueue) → `synced` (on ack with "applied") or `conflict` (on conflicting Bear push)
+
+## Database
+
+- Bear SQLite uses Core Data epoch timestamps (float64 seconds since 2001-01-01)
+- Conversion: `unix_ts = core_data_ts + 978307200` (defined as `mapper.CoreDataEpochOffset`)
+
+## Bridge State
+
+- State file: `~/.bear-bridge-state.json` (path overridable via `BRIDGE_STATE_PATH`)
+- `last_sync_at`: Core Data epoch (float64, NOT Unix epoch) — used as `>= lastSyncAt` delta read threshold
+- `junction_full_scan_counter`: incremented every cycle; triggers full junction table scan every 12 cycles (`junctionFullScanInterval`)
+- `known_*_ids`: Bear UUIDs seen on last sync; diffed against current Bear DB to produce `deleted_*_ids` in push requests
+- Absent state file → initial sync (full export in 50-note batches); state written atomically (write to `.tmp` then `rename`)

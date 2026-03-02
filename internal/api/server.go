@@ -15,6 +15,8 @@ import (
 	"github.com/romancha/bear-sync/internal/store"
 )
 
+const syncStatusConflict = "conflict"
+
 // Server holds the HTTP handler and dependencies.
 type Server struct {
 	router         chi.Router
@@ -36,6 +38,11 @@ func NewServer(s store.Store, openclawToken, bridgeToken, attachmentsDir string)
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(requestLogger)
+
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
 
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/notes", func(r chi.Router) {

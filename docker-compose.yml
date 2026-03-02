@@ -1,0 +1,48 @@
+services:
+  hub:
+    build: .
+    image: ghcr.io/romancha/bear-sync-hub:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HUB_HOST: "0.0.0.0"
+      HUB_DB_PATH: /data/hub.db
+      HUB_ATTACHMENTS_DIR: /data/attachments
+    volumes:
+      - hub-data:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      hub:
+        condition: service_healthy
+    networks:
+      - internal
+
+volumes:
+  hub-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:
+    driver: bridge

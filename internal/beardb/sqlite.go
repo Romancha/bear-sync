@@ -3,6 +3,7 @@ package beardb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -21,7 +22,7 @@ type SQLiteBearDB struct {
 
 // New opens Bear's SQLite database in read-only mode.
 func New(dbPath string) (*SQLiteBearDB, error) {
-	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
+	db, err := sql.Open("sqlite", dbPath+"?mode=ro&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("open bear db: %w", err)
 	}
@@ -288,7 +289,7 @@ func (s *SQLiteBearDB) NoteTagsForNotes(ctx context.Context, noteUUIDs []string)
 		" WHERE n.ZUNIQUEIDENTIFIER IN (" + strings.Join(placeholders, ",") + ")" +
 		" AND t.ZUNIQUEIDENTIFIER IS NOT NULL"
 
-	return s.queryJunctionWithArgs(ctx, query, args...)
+	return s.queryJunction(ctx, query, args...)
 }
 
 // PinnedNoteTagsForNotes returns pinned note-tag associations for specific note UUIDs.
@@ -313,7 +314,7 @@ func (s *SQLiteBearDB) PinnedNoteTagsForNotes(ctx context.Context, noteUUIDs []s
 		" WHERE n.ZUNIQUEIDENTIFIER IN (" + strings.Join(placeholders, ",") + ")" +
 		" AND t.ZUNIQUEIDENTIFIER IS NOT NULL"
 
-	return s.queryJunctionWithArgs(ctx, query, args...)
+	return s.queryJunction(ctx, query, args...)
 }
 
 // AllNoteUUIDs returns UUIDs of all notes.
@@ -349,7 +350,7 @@ func (s *SQLiteBearDB) NoteByUUID(ctx context.Context, bearUUID string) (*NoteBa
 		bearUUID,
 	).Scan(&info.UUID, &title, &body, &trashed)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("query note by uuid: %w", err)
@@ -440,13 +441,8 @@ func (s *SQLiteBearDB) FindRecentNotesByTitle(
 	return result, nil
 }
 
-// queryJunction executes a junction table query and returns NoteTagPair results.
-func (s *SQLiteBearDB) queryJunction(ctx context.Context, query string) ([]NoteTagPair, error) {
-	return s.queryJunctionWithArgs(ctx, query)
-}
-
-// queryJunctionWithArgs executes a junction table query with args and returns NoteTagPair results.
-func (s *SQLiteBearDB) queryJunctionWithArgs(ctx context.Context, query string, args ...any) ([]NoteTagPair, error) {
+// queryJunction executes a junction table query with optional args and returns NoteTagPair results.
+func (s *SQLiteBearDB) queryJunction(ctx context.Context, query string, args ...any) ([]NoteTagPair, error) {
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query junction: %w", err)

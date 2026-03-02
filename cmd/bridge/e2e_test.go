@@ -29,6 +29,7 @@ import (
 const (
 	coreDataEpochOffsetE2E = 978307200
 	firstNoteTitle         = "First Note"
+	actionCreateE2E        = "create"
 )
 
 func coreDataDateE2E(unixSec int64) float64 {
@@ -593,7 +594,7 @@ func TestE2E_WriteFlow(t *testing.T) {
 	for _, item := range items {
 		actions[item.Action] = true
 	}
-	assert.True(t, actions["create"])
+	assert.True(t, actions[actionCreateE2E])
 	assert.True(t, actions["update"])
 	assert.True(t, actions["add_tag"])
 	assert.True(t, actions["trash"])
@@ -606,7 +607,7 @@ func TestE2E_WriteFlow(t *testing.T) {
 			IdempotencyKey: item.IdempotencyKey,
 			Status:         "applied",
 		}
-		if item.Action == "create" {
+		if item.Action == actionCreateE2E {
 			ack.BearID = "new-bear-uuid-from-xcall"
 		}
 		ackItems = append(ackItems, ack)
@@ -649,7 +650,7 @@ func TestE2E_Idempotency(t *testing.T) {
 
 	createCount := 0
 	for _, item := range items {
-		if item.Action == "create" && item.NoteID == note1.ID {
+		if item.Action == actionCreateE2E && item.NoteID == note1.ID {
 			createCount++
 		}
 	}

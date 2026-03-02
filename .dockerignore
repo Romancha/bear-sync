@@ -1,0 +1,13 @@
+bin/
+.git/
+.github/
+.idea/
+.claude/
+testdata/
+deploy/
+docs/
+*.db
+*.db-wal
+*.db-shm
+.env*
+coverage.*

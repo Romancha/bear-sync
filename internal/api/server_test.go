@@ -317,8 +317,9 @@ func TestCreateNote_MissingIdempotencyKey(t *testing.T) {
 func TestUpdateNote(t *testing.T) {
 	ts, s := setupServer(t)
 
+	bearID := "bear-note-abc"
 	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
-		ID: "note-1", Title: "Old Title", Body: "Old body",
+		ID: "note-1", Title: "Old Title", Body: "Old body", BearID: &bearID,
 	}))
 
 	body := map[string]string{"title": "New Title", "body": "New body"}
@@ -332,10 +333,26 @@ func TestUpdateNote(t *testing.T) {
 	assert.Equal(t, "pending_to_bear", result["sync_status"])
 }
 
+func TestUpdateNote_NoBearID_409(t *testing.T) {
+	ts, s := setupServer(t)
+
+	// Note without bear_id simulates a note created by openclaw but not yet synced to Bear.
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-pending", Title: "Pending Note", Body: "body", SyncStatus: "pending_to_bear",
+	}))
+
+	body := map[string]string{"body": "Updated body"}
+	resp := doRequest(t, ts, http.MethodPut, "/api/notes/note-pending", body, openclawToken,
+		map[string]string{"Idempotency-Key": "key-pending-upd"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+}
+
 func TestUpdateNote_NotFound(t *testing.T) {
 	ts, _ := setupServer(t)
 
-	body := map[string]string{"title": "New Title"}
+	body := map[string]string{"title": "New Title", "body": "Some body"}
 
 	resp := doRequest(t, ts, http.MethodPut, "/api/notes/nonexistent", body, openclawToken,
 		map[string]string{"Idempotency-Key": "key-2"})
@@ -351,7 +368,7 @@ func TestUpdateNote_Encrypted403(t *testing.T) {
 		ID: "enc-1", Title: "Encrypted", Body: "", Encrypted: 1,
 	}))
 
-	body := map[string]string{"title": "Updated"}
+	body := map[string]string{"title": "Updated", "body": "Some body"}
 
 	resp := doRequest(t, ts, http.MethodPut, "/api/notes/enc-1", body, openclawToken,
 		map[string]string{"Idempotency-Key": "key-3"})
@@ -363,8 +380,9 @@ func TestUpdateNote_Encrypted403(t *testing.T) {
 func TestTrashNote(t *testing.T) {
 	ts, s := setupServer(t)
 
+	bearID := "bear-trash-abc"
 	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
-		ID: "note-1", Title: "To Trash",
+		ID: "note-1", Title: "To Trash", BearID: &bearID,
 	}))
 
 	resp := doRequest(t, ts, http.MethodDelete, "/api/notes/note-1", nil, openclawToken,
@@ -374,6 +392,20 @@ func TestTrashNote(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, float64(1), result["trashed"])
 	assert.Equal(t, "pending_to_bear", result["sync_status"])
+}
+
+func TestTrashNote_NoBearID_409(t *testing.T) {
+	ts, s := setupServer(t)
+
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-pending", Title: "Pending Note", SyncStatus: "pending_to_bear",
+	}))
+
+	resp := doRequest(t, ts, http.MethodDelete, "/api/notes/note-pending", nil, openclawToken,
+		map[string]string{"Idempotency-Key": "key-trash-no-bear"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
 }
 
 func TestTrashNote_Encrypted403(t *testing.T) {
@@ -420,8 +452,9 @@ func TestListTags_WithData(t *testing.T) {
 func TestAddTag(t *testing.T) {
 	ts, s := setupServer(t)
 
+	bearID := "bear-tag-abc"
 	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
-		ID: "note-1", Title: "Note",
+		ID: "note-1", Title: "Note", BearID: &bearID,
 	}))
 
 	body := map[string]string{"tag": "new-tag"}
@@ -445,6 +478,22 @@ func TestAddTag_NoteNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
+func TestAddTag_NoBearID_409(t *testing.T) {
+	ts, s := setupServer(t)
+
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-pending", Title: "Pending Note", SyncStatus: "pending_to_bear",
+	}))
+
+	body := map[string]string{"tag": "new-tag"}
+
+	resp := doRequest(t, ts, http.MethodPost, "/api/notes/note-pending/tags", body, openclawToken,
+		map[string]string{"Idempotency-Key": "key-tag-no-bear"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+}
+
 func TestAddTag_Encrypted403(t *testing.T) {
 	ts, s := setupServer(t)
 
@@ -464,8 +513,9 @@ func TestAddTag_Encrypted403(t *testing.T) {
 func TestAddTag_MissingTag(t *testing.T) {
 	ts, s := setupServer(t)
 
+	bearID := "bear-tag-missing-abc"
 	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
-		ID: "note-1", Title: "Note",
+		ID: "note-1", Title: "Note", BearID: &bearID,
 	}))
 
 	body := map[string]string{}
@@ -685,7 +735,7 @@ func TestSyncStatus(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "2025-01-01T00:00:00Z", result["last_push_at"])
 	assert.Equal(t, "true", result["initial_sync_complete"])
-	assert.Equal(t, "0", result["queue_size"])
+	assert.Equal(t, float64(0), result["queue_size"])
 }
 
 // --- Idempotency tests ---
@@ -702,12 +752,15 @@ func TestIdempotency_CreateNoteDuplicate(t *testing.T) {
 
 	noteID := result1["id"].(string)
 
-	// Second request creates another note but the queue item is deduplicated by idempotency key.
+	// Second request with same idempotency key must return the same note (idempotent).
 	resp2 := doRequest(t, ts, http.MethodPost, "/api/notes", body, openclawToken, headers)
-	defer resp2.Body.Close() //nolint:errcheck // test
+	result2 := readBody(t, resp2)
 	assert.Equal(t, http.StatusCreated, resp2.StatusCode)
 
-	// Verify original note exists.
+	// Must return the same note ID, not create a second note.
+	assert.Equal(t, noteID, result2["id"].(string), "idempotent request must return the original note ID")
+
+	// Verify exactly one note exists with that ID.
 	note, err := s.GetNote(t.Context(), noteID)
 	require.NoError(t, err)
 	assert.NotNil(t, note)

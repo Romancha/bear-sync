@@ -632,6 +632,11 @@ func TestWriteQueue_AckApplied(t *testing.T) {
 		{QueueID: item.ID, IdempotencyKey: "key-ack", Status: "applied", BearID: "bear-new-123"},
 	})
 	require.NoError(t, err)
+
+	// Verify: queue item was removed after ack.
+	leased, err := s.LeaseQueueItems(ctx, "bridge-check", 5*time.Minute)
+	require.NoError(t, err)
+	assert.Nil(t, leased, "queue should be empty after ack")
 }
 
 func TestWriteQueue_AckApplied_FillsBearID(t *testing.T) {

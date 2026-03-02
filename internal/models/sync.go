@@ -30,9 +30,10 @@ type SyncAckRequest struct {
 
 // SyncAckItem represents the result of applying a single write queue item in Bear.
 type SyncAckItem struct {
-	QueueID        int64  `json:"queue_id"`
-	IdempotencyKey string `json:"idempotency_key"`
-	Status         string `json:"status"` // applied | failed
-	BearID         string `json:"bear_id,omitempty"`
-	Error          string `json:"error,omitempty"`
+	QueueID          int64  `json:"queue_id"`
+	IdempotencyKey   string `json:"idempotency_key"`
+	Status           string `json:"status"` // applied | failed
+	BearID           string `json:"bear_id,omitempty"`
+	Error            string `json:"error,omitempty"`
+	ConflictResolved bool   `json:"conflict_resolved,omitempty"` // true when bridge handled a conflict item
 }

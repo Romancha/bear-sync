@@ -152,7 +152,7 @@ func TestGetSyncStatus_Success(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"last_sync_at": "2026-03-01T10:00:00Z",
 			"last_push_at": "2026-03-01T10:05:00Z",
-			"queue_size": "3",
+			"queue_size": 3,
 			"initial_sync_complete": "true"
 		}`))
 	}))
@@ -162,7 +162,7 @@ func TestGetSyncStatus_Success(t *testing.T) {
 
 	assert.Equal(t, "2026-03-01T10:00:00Z", status.LastSyncAt)
 	assert.Equal(t, "2026-03-01T10:05:00Z", status.LastPushAt)
-	assert.Equal(t, "3", status.QueueSize)
+	assert.Equal(t, 3, status.QueueSize)
 	assert.Equal(t, "true", status.InitialSyncComplete)
 }
 

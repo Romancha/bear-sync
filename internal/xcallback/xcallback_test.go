@@ -94,16 +94,16 @@ func TestCreate(t *testing.T) {
 		assert.Empty(t, parsed.Query().Get("tags"))
 	})
 
-	t.Run("empty identifier", func(t *testing.T) {
+	t.Run("empty identifier returns empty string without error", func(t *testing.T) {
 		resp := xcallResult{}
 		respJSON, _ := json.Marshal(resp)
 		executor := &mockExecutor{output: respJSON}
 		x := newTestXcall(executor)
 
-		_, err := x.Create(context.Background(), "tok", "Title", "Body", nil)
+		bearID, err := x.Create(context.Background(), "tok", "Title", "Body", nil)
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "empty identifier")
+		require.NoError(t, err)
+		assert.Empty(t, bearID)
 	})
 
 	t.Run("bear error", func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, "test-token", q.Get("token"))
 		assert.Equal(t, "BEAR-UUID", q.Get("id"))
 		assert.Equal(t, "New body content", q.Get("text"))
-		assert.Equal(t, "replace_all", q.Get("mode"))
+		assert.Equal(t, "replace", q.Get("mode"))
 		assert.Equal(t, "no", q.Get("show_window"))
 		assert.Equal(t, "no", q.Get("open_note"))
 	})

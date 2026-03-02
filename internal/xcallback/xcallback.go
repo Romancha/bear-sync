@@ -143,7 +143,9 @@ func (x *Xcall) Create(ctx context.Context, token, title, body string, tags []st
 	}
 
 	if result.Identifier == "" {
-		return "", fmt.Errorf("xcall create: empty identifier in response")
+		// Return empty ID without error so the caller can attempt fallback verification.
+		x.logger.Warn("xcall create: empty identifier in response")
+		return "", nil
 	}
 
 	x.logger.Info("xcall create succeeded", "bear_id", result.Identifier)
@@ -156,7 +158,7 @@ func (x *Xcall) Update(ctx context.Context, token, bearID, body string) error {
 	params.Set("token", token)
 	params.Set("id", bearID)
 	params.Set("text", body)
-	params.Set("mode", "replace_all")
+	params.Set("mode", "replace")
 	params.Set("show_window", "no")
 	params.Set("open_note", "no")
 

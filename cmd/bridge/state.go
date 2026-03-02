@@ -56,6 +56,7 @@ func saveState(path string, state *BridgeState) error {
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename state file: %w", err)
 	}
 

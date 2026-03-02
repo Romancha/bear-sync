@@ -16,6 +16,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const syncStatusConflict = "conflict"
+
 // SQLiteStore implements Store using SQLite.
 type SQLiteStore struct {
 	db *sql.DB
@@ -44,6 +46,11 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("set foreign_keys: %w", err)
 	}
+
+	// Serialize all writes through a single connection to avoid SQLite locking contention.
+	// WAL mode allows concurrent reads but serializes writes; using one connection avoids
+	// busy_timeout delays under concurrent API load.
+	db.SetMaxOpenConns(1)
 
 	s := &SQLiteStore{db: db}
 	if err := s.migrate(ctx); err != nil {
@@ -253,7 +260,9 @@ END;
 
 //nolint:gocritic // intentional value receiver for simple filter struct
 func (s *SQLiteStore) ListNotes(ctx context.Context, filter NoteFilter) ([]models.Note, error) {
-	var where []string
+	// Always exclude permanently-deleted and archived notes from the API listing.
+	// These are hidden in Bear's UI and should not be surfaced to openclaw.
+	where := []string{"n.permanently_deleted = 0", "n.archived = 0"}
 	var args []any
 
 	if filter.Tag != "" {
@@ -418,6 +427,14 @@ func (s *SQLiteStore) UpdateNote(ctx context.Context, note *models.Note) error {
 	return nil
 }
 
+// DeleteNote removes a note by its ID.
+func (s *SQLiteStore) DeleteNote(ctx context.Context, id string) error {
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM notes WHERE id = ?", id); err != nil {
+		return fmt.Errorf("delete note: %w", err)
+	}
+	return nil
+}
+
 // --- FTS5 Search ---
 
 func (s *SQLiteStore) SearchNotes(
@@ -430,8 +447,11 @@ func (s *SQLiteStore) SearchNotes(
 	var where []string
 	var args []any
 
+	// Sanitize FTS5 query: wrap in double quotes to treat as phrase search,
+	// escaping any embedded double quotes to prevent FTS5 syntax injection.
+	sanitized := `"` + strings.ReplaceAll(query, `"`, `""`) + `"`
 	where = append(where, "notes_fts MATCH ?")
-	args = append(args, query)
+	args = append(args, sanitized)
 
 	if tag != "" {
 		where = append(where,
@@ -699,6 +719,10 @@ func (s *SQLiteStore) ProcessSyncPush(ctx context.Context, req models.SyncPushRe
 		}
 	}
 
+	if err := failQueueItemsForDeletedNotes(ctx, tx, req.DeletedNoteIDs); err != nil {
+		return fmt.Errorf("fail queue items for deleted notes: %w", err)
+	}
+
 	if err := deleteByBearIDs(ctx, tx, "notes", req.DeletedNoteIDs); err != nil {
 		return fmt.Errorf("delete notes: %w", err)
 	}
@@ -752,7 +776,7 @@ func updateExistingNote(
 		// the user edited the note while openclaw had pending changes.
 		newSyncStatus := "pending_to_bear"
 		if note.ModifiedAt != "" && existingModifiedAt != "" && note.ModifiedAt != existingModifiedAt {
-			newSyncStatus = "conflict"
+			newSyncStatus = syncStatusConflict
 		}
 
 		query := `UPDATE notes SET
@@ -788,6 +812,12 @@ func updateExistingNote(
 	}
 
 	note.ID = existingID
+
+	// Preserve conflict status: a Bear delta push must not silently clear a conflict
+	// that has been set but not yet processed by the bridge.
+	if existingSyncStatus == syncStatusConflict {
+		note.SyncStatus = syncStatusConflict
+	}
 
 	query := `UPDATE notes SET
 		bear_id = ?, title = ?, subtitle = ?, body = ?,
@@ -1072,9 +1102,13 @@ func replaceNoteTags(
 	// Also resolve note IDs referenced in pairs (notes may have been pushed in a separate request).
 	for _, pair := range pairs {
 		if _, ok := noteHubIDs[pair.NoteID]; !ok {
-			resolved := resolveNoteID(ctx, tx, pair.NoteID)
-			if resolved != "" {
-				noteHubIDs[pair.NoteID] = resolved
+			var hubID string
+
+			err := tx.QueryRowContext(ctx,
+				"SELECT id FROM notes WHERE bear_id = ? OR id = ?", pair.NoteID, pair.NoteID,
+			).Scan(&hubID)
+			if err == nil {
+				noteHubIDs[pair.NoteID] = hubID
 			}
 		}
 	}
@@ -1109,22 +1143,36 @@ func replaceNoteTags(
 		return fmt.Errorf("delete %s: %w", table, err)
 	}
 
-	for _, pair := range pairs {
-		noteID := pair.NoteID
-		tagID := pair.TagID
+	return insertNoteTagPairs(ctx, tx, table, pairs, noteHubIDs)
+}
 
-		if resolved, ok := noteHubIDs[noteID]; ok {
-			noteID = resolved
+func insertNoteTagPairs(
+	ctx context.Context, tx *sql.Tx, table string,
+	pairs []models.NoteTagPair, noteHubIDs map[string]string,
+) error {
+	for _, pair := range pairs {
+		// Skip sentinel pairs (empty TagID) used to signal "clear all tags for this note".
+		// The note was already resolved and its tags deleted above; nothing to insert.
+		if pair.TagID == "" {
+			continue
+		}
+
+		resolved, ok := noteHubIDs[pair.NoteID]
+		if !ok {
+			slog.Warn("skip note-tag pair: note not found",
+				"note_id", pair.NoteID, "table", table)
+
+			continue
 		}
 
 		var resolvedTagID string
 
 		err := tx.QueryRowContext(ctx,
-			"SELECT id FROM tags WHERE bear_id = ? OR id = ?", tagID, tagID,
+			"SELECT id FROM tags WHERE bear_id = ? OR id = ?", pair.TagID, pair.TagID,
 		).Scan(&resolvedTagID)
 		if err != nil {
 			slog.Warn("skip note-tag pair: tag not found",
-				"tag_id", tagID, "table", table)
+				"tag_id", pair.TagID, "table", table)
 
 			continue
 		}
@@ -1133,7 +1181,7 @@ func replaceNoteTags(
 		insertQuery := "INSERT OR IGNORE INTO " + table +
 			" (note_id, tag_id) VALUES (?, ?)"
 
-		if _, err := tx.ExecContext(ctx, insertQuery, noteID, resolvedTagID); err != nil {
+		if _, err := tx.ExecContext(ctx, insertQuery, resolved, resolvedTagID); err != nil {
 			return fmt.Errorf("insert %s: %w", table, err)
 		}
 	}
@@ -1155,6 +1203,35 @@ func resolveNoteID(ctx context.Context, tx *sql.Tx, id string) string {
 	}
 
 	return id
+}
+
+// failQueueItemsForDeletedNotes marks pending/processing write_queue items as failed
+// for any notes that are about to be deleted. This prevents orphaned queue items
+// whose note_id no longer references any row in the notes table.
+func failQueueItemsForDeletedNotes(ctx context.Context, tx *sql.Tx, bearIDs []string) error {
+	if len(bearIDs) == 0 {
+		return nil
+	}
+
+	placeholders := make([]string, len(bearIDs))
+	args := make([]any, len(bearIDs))
+
+	for i, id := range bearIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	// Resolve bear_ids to hub note IDs, then fail their queue items.
+	//nolint:gosec // placeholders are parameterized "?" values, not user input
+	query := "UPDATE write_queue SET status = 'failed', error = 'note deleted from Bear'" +
+		" WHERE status IN ('pending', 'processing')" +
+		" AND note_id IN (SELECT id FROM notes WHERE bear_id IN (" + strings.Join(placeholders, ",") + "))"
+
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("fail queue items: %w", err)
+	}
+
+	return nil
 }
 
 func deleteByBearIDs(ctx context.Context, tx *sql.Tx, table string, bearIDs []string) error {
@@ -1182,6 +1259,20 @@ func deleteByBearIDs(ctx context.Context, tx *sql.Tx, table string, bearIDs []st
 }
 
 // --- Write Queue ---
+
+func (s *SQLiteStore) GetQueueItemByIdempotencyKey(ctx context.Context, key string) (*models.WriteQueueItem, error) {
+	item, err := scanWriteQueueRow(s.db.QueryRowContext(ctx,
+		"SELECT "+writeQueueColumns()+" FROM write_queue WHERE idempotency_key = ?", key,
+	))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get queue item by idempotency key: %w", err)
+	}
+
+	return &item, nil
+}
 
 func (s *SQLiteStore) EnqueueWrite(
 	ctx context.Context,
@@ -1263,10 +1354,14 @@ func (s *SQLiteStore) LeaseQueueItems(
 		items = append(items, item)
 	}
 
-	_ = rows.Close()
-
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+
 		return nil, fmt.Errorf("iterate queue items: %w", err)
+	}
+
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close queue rows: %w", err)
 	}
 
 	if len(items) == 0 {
@@ -1317,8 +1412,8 @@ func (s *SQLiteStore) AckQueueItems(ctx context.Context, items []models.SyncAckI
 
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	for _, item := range items {
-		if err := ackSingleItem(ctx, tx, item, now); err != nil {
+	for i := range items {
+		if err := ackSingleItem(ctx, tx, &items[i], now); err != nil {
 			return err
 		}
 	}
@@ -1330,7 +1425,7 @@ func (s *SQLiteStore) AckQueueItems(ctx context.Context, items []models.SyncAckI
 	return nil
 }
 
-func ackSingleItem(ctx context.Context, tx *sql.Tx, item models.SyncAckItem, now string) error {
+func ackSingleItem(ctx context.Context, tx *sql.Tx, item *models.SyncAckItem, now string) error {
 	var currentStatus string
 
 	err := tx.QueryRowContext(ctx,
@@ -1363,7 +1458,7 @@ func ackSingleItem(ctx context.Context, tx *sql.Tx, item models.SyncAckItem, now
 	return nil
 }
 
-func ackApplied(ctx context.Context, tx *sql.Tx, item models.SyncAckItem, now string) error {
+func ackApplied(ctx context.Context, tx *sql.Tx, item *models.SyncAckItem, now string) error {
 	if _, err := tx.ExecContext(ctx,
 		"UPDATE write_queue SET status = 'applied', applied_at = ?, error = NULL "+
 			"WHERE idempotency_key = ?",
@@ -1379,16 +1474,25 @@ func ackApplied(ctx context.Context, tx *sql.Tx, item models.SyncAckItem, now st
 		item.IdempotencyKey,
 	).Scan(&noteID)
 	if err == nil && noteID.Valid && noteID.String != "" {
-		if item.BearID != "" {
+		switch {
+		case item.ConflictResolved:
+			// Bridge handled a conflict item: clear conflict status unconditionally.
 			if _, err := tx.ExecContext(ctx,
-				"UPDATE notes SET bear_id = ?, sync_status = 'synced' WHERE id = ?",
+				"UPDATE notes SET sync_status = 'synced' WHERE id = ?",
+				noteID.String,
+			); err != nil {
+				return fmt.Errorf("clear conflict status on ack: %w", err)
+			}
+		case item.BearID != "":
+			if _, err := tx.ExecContext(ctx,
+				"UPDATE notes SET bear_id = ?, sync_status = 'synced' WHERE id = ? AND sync_status != 'conflict'",
 				item.BearID, noteID.String,
 			); err != nil {
 				return fmt.Errorf("set bear_id on ack: %w", err)
 			}
-		} else {
+		default:
 			if _, err := tx.ExecContext(ctx,
-				"UPDATE notes SET sync_status = 'synced' WHERE id = ?",
+				"UPDATE notes SET sync_status = 'synced' WHERE id = ? AND sync_status != 'conflict'",
 				noteID.String,
 			); err != nil {
 				return fmt.Errorf("reset sync_status on ack: %w", err)

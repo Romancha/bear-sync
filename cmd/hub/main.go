@@ -24,6 +24,7 @@ func main() {
 }
 
 type config struct {
+	host           string
 	port           string
 	dbPath         string
 	openclawToken  string
@@ -33,11 +34,16 @@ type config struct {
 
 func loadConfig() (*config, error) {
 	cfg := &config{
+		host:           os.Getenv("HUB_HOST"),
 		port:           os.Getenv("HUB_PORT"),
 		dbPath:         os.Getenv("HUB_DB_PATH"),
 		openclawToken:  os.Getenv("HUB_OPENCLAW_TOKEN"),
 		bridgeToken:    os.Getenv("HUB_BRIDGE_TOKEN"),
 		attachmentsDir: os.Getenv("HUB_ATTACHMENTS_DIR"),
+	}
+
+	if cfg.host == "" {
+		cfg.host = "127.0.0.1"
 	}
 
 	if cfg.port == "" {
@@ -86,12 +92,14 @@ func run() error {
 
 	srv := api.NewServer(s, cfg.openclawToken, cfg.bridgeToken, cfg.attachmentsDir)
 
-	addr := net.JoinHostPort("127.0.0.1", cfg.port)
+	addr := net.JoinHostPort(cfg.host, cfg.port)
 
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           srv,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)

@@ -6,6 +6,8 @@ coverage.html
 *.db-shm
 .bear-bridge-state.json
 .bear-bridge.lock
+.env
+.idea/
 
 # ralphex progress logs
 .ralphex/progress/

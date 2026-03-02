@@ -702,9 +702,9 @@ func TestResolveAttachmentFilePath(t *testing.T) {
 	path = b.resolveAttachmentFilePath("file", "file-1", "doc.pdf")
 	assert.Equal(t, filepath.Join(fileDir, "doc.pdf"), path)
 
-	// Video type also resolves to Note Files.
-	path = b.resolveAttachmentFilePath("video", "file-1", "doc.pdf")
-	assert.Equal(t, filepath.Join(fileDir, "doc.pdf"), path)
+	// Video type resolves to Note Images (Bear stores videos alongside images).
+	path = b.resolveAttachmentFilePath("video", "img-1", "photo.jpg")
+	assert.Equal(t, filepath.Join(imgDir, "photo.jpg"), path)
 
 	// Missing file returns empty.
 	path = b.resolveAttachmentFilePath("image", "nonexistent", "nope.jpg")

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -39,8 +38,11 @@ func (s *Server) syncPush(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to set last_push_at", "error", err)
 	}
 
-	// Store any metadata key-value pairs from the push request.
+	// Store any metadata key-value pairs from the push request, skipping protected keys.
 	for k, v := range req.Meta {
+		if k == "last_push_at" {
+			continue
+		}
 		if err := s.store.SetSyncMeta(r.Context(), k, v); err != nil {
 			slog.Warn("failed to set sync meta", "key", k, "error", err)
 		}
@@ -135,6 +137,15 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fallback: the bridge may send bear_id instead of hub ID (mapper generates ephemeral IDs).
+	if attachment == nil {
+		attachment, err = s.store.GetAttachmentByBearID(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to get attachment")
+			return
+		}
+	}
+
 	if attachment == nil {
 		writeError(w, http.StatusNotFound, "attachment not found")
 		return
@@ -159,15 +170,23 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create file")
 		return
 	}
-	defer f.Close() //nolint:errcheck // best-effort close on write path
 
 	if _, err := io.Copy(f, r.Body); err != nil {
+		f.Close()                     //nolint:errcheck,gosec // closing before cleanup
+		os.Remove(filePath)           //nolint:errcheck,gosec // clean up partial file
 		writeError(w, http.StatusInternalServerError, "failed to write file")
+		return
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(filePath) //nolint:errcheck,gosec // clean up on flush failure
+		writeError(w, http.StatusInternalServerError, "failed to finalize file")
 		return
 	}
 
 	attachment.FilePath = filePath
 	if updateErr := s.store.UpdateAttachment(r.Context(), attachment); updateErr != nil {
+		os.Remove(filePath) //nolint:errcheck,gosec // best-effort cleanup on DB failure
 		writeError(w, http.StatusInternalServerError, "failed to update attachment path")
 		return
 	}
@@ -178,7 +197,7 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 type syncStatusResponse struct {
 	LastSyncAt          string   `json:"last_sync_at"`
 	LastPushAt          string   `json:"last_push_at"`
-	QueueSize           string   `json:"queue_size"`
+	QueueSize           int      `json:"queue_size"`
 	InitialSyncComplete string   `json:"initial_sync_complete"`
 	ConflictCount       int      `json:"conflict_count"`
 	ConflictNoteIDs     []string `json:"conflict_note_ids,omitempty"`
@@ -195,7 +214,7 @@ func (s *Server) syncStatus(w http.ResponseWriter, r *http.Request) {
 
 	count, err := s.store.PendingQueueCount(ctx)
 	if err == nil {
-		resp.QueueSize = fmt.Sprintf("%d", count)
+		resp.QueueSize = count
 	}
 
 	conflictCount, err := s.store.CountConflicts(ctx)

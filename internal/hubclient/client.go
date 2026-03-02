@@ -19,7 +19,7 @@ import (
 type SyncStatus struct {
 	LastSyncAt          string `json:"last_sync_at"`
 	LastPushAt          string `json:"last_push_at"`
-	QueueSize           string `json:"queue_size"`
+	QueueSize           int    `json:"queue_size"`
 	InitialSyncComplete string `json:"initial_sync_complete"`
 }
 
@@ -127,7 +127,15 @@ func (c *HTTPClient) AckQueue(ctx context.Context, items []models.SyncAckItem) e
 func (c *HTTPClient) UploadAttachment(ctx context.Context, attachmentID string, reader io.Reader) error {
 	path := "/api/sync/attachments/" + attachmentID
 
-	resp, err := c.doWithRetry(ctx, http.MethodPost, path, reader)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, reader)
+	if err != nil {
+		return fmt.Errorf("create upload request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.httpClient.Do(req) //nolint:bodyclose,gosec // caller-like close below; URL from trusted config
 	if err != nil {
 		return fmt.Errorf("upload attachment: %w", err)
 	}
@@ -255,7 +263,7 @@ func (e *apiError) Error() string {
 }
 
 func parseErrorResponse(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096)) //nolint:errcheck // best-effort read, capped at 4KB
 
 	var errResp struct {
 		Error string `json:"error"`

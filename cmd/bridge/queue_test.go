@@ -497,7 +497,7 @@ func TestProcessQueue_ConflictCreatesConflictNote(t *testing.T) {
 	// Should have acked as applied.
 	require.Len(t, hub.ackItems, 1)
 	assert.Equal(t, "applied", hub.ackItems[0].Status)
-	assert.Equal(t, "conflict-bear-id", hub.ackItems[0].BearID)
+	assert.Equal(t, "", hub.ackItems[0].BearID)
 }
 
 func TestProcessQueue_ConflictWithTitleInPayload(t *testing.T) {
