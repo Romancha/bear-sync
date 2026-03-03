@@ -68,6 +68,16 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idempotencyKey := r.Header.Get("Idempotency-Key")
+	consumerID := ConsumerIDFromContext(r.Context())
+
+	// Check idempotency before enqueuing to prevent duplicate queue items on retries.
+	if idempotencyKey != "" {
+		existing, err := s.store.GetQueueItemByIdempotencyKey(r.Context(), idempotencyKey, consumerID)
+		if isRetryableQueueItem(existing, err) {
+			writeJSON(w, http.StatusCreated, existing)
+			return
+		}
+	}
 
 	tagPayload := map[string]string{"tag": req.Tag}
 	if note.BearID != nil && *note.BearID != "" {
@@ -77,7 +87,7 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(tagPayload) //nolint:errcheck // marshaling a simple map cannot fail
 
 	item, err := s.store.EnqueueWrite(
-		r.Context(), idempotencyKey, "add_tag", note.ID, string(payload), ConsumerIDFromContext(r.Context()),
+		r.Context(), idempotencyKey, "add_tag", note.ID, string(payload), consumerID,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
