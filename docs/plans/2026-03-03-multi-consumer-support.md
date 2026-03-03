@@ -94,15 +94,15 @@ Refactor bear-sync hub from being hardcoded to a single external consumer (openc
 - [x] run tests — must pass before next task
 
 ### Task 6: Pass consumer_id through API handlers to write queue
-- [ ] write tests: POST /api/notes creates queue item with correct consumer_id from auth context
-- [ ] write tests: PUT /api/notes/{id} creates queue item with correct consumer_id
-- [ ] write tests: DELETE /api/notes/{id} creates queue item with correct consumer_id
-- [ ] write tests: POST /api/notes/{noteID}/tags creates queue item with correct consumer_id
-- [ ] update `handleCreateNote` to extract consumer_id from context and pass to `EnqueueWrite`
-- [ ] update `handleUpdateNote` to extract consumer_id from context and pass to `EnqueueWrite`
-- [ ] update `handleTrashNote` to extract consumer_id from context and pass to `EnqueueWrite`
-- [ ] update `handleAddTag` to extract consumer_id from context and pass to `EnqueueWrite`
-- [ ] run tests — must pass before next task
+- [x] write tests: POST /api/notes creates queue item with correct consumer_id from auth context
+- [x] write tests: PUT /api/notes/{id} creates queue item with correct consumer_id
+- [x] write tests: DELETE /api/notes/{id} creates queue item with correct consumer_id
+- [x] write tests: POST /api/notes/{noteID}/tags creates queue item with correct consumer_id
+- [x] update `handleCreateNote` to extract consumer_id from context and pass to `EnqueueWrite`
+- [x] update `handleUpdateNote` to extract consumer_id from context and pass to `EnqueueWrite`
+- [x] update `handleTrashNote` to extract consumer_id from context and pass to `EnqueueWrite`
+- [x] update `handleAddTag` to extract consumer_id from context and pass to `EnqueueWrite`
+- [x] run tests — must pass before next task
 
 ### Task 7: Update bridge queue processing (passthrough)
 - [ ] verify bridge queue processing handles `ConsumerID` field (scan from API response)

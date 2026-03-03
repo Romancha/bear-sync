@@ -77,7 +77,7 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(tagPayload) //nolint:errcheck // marshaling a simple map cannot fail
 
 	item, err := s.store.EnqueueWrite(
-		r.Context(), idempotencyKey, "add_tag", note.ID, string(payload), "",
+		r.Context(), idempotencyKey, "add_tag", note.ID, string(payload), ConsumerIDFromContext(r.Context()),
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to enqueue write")

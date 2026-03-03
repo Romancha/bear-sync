@@ -170,7 +170,7 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := s.store.EnqueueWrite(
-		r.Context(), idempotencyKey, "create", note.ID, string(payload), "",
+		r.Context(), idempotencyKey, "create", note.ID, string(payload), ConsumerIDFromContext(r.Context()),
 	); err != nil {
 		// Compensate: delete the orphaned note to avoid a stuck pending_to_bear record.
 		if delErr := s.store.DeleteNote(r.Context(), note.ID); delErr != nil {
@@ -281,7 +281,7 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(payloadMap) //nolint:errcheck // marshaling a simple map cannot fail
 
 	if _, err := s.store.EnqueueWrite(
-		r.Context(), idempotencyKey, "update", note.ID, string(payload), "",
+		r.Context(), idempotencyKey, "update", note.ID, string(payload), ConsumerIDFromContext(r.Context()),
 	); err != nil {
 		// Restore original note state to avoid permanently stuck pending_to_bear.
 		note.Title = oldTitle
@@ -365,7 +365,7 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(trashPayload) //nolint:errcheck // cannot fail
 
 	if _, err := s.store.EnqueueWrite(
-		r.Context(), idempotencyKey, "trash", note.ID, string(payload), "",
+		r.Context(), idempotencyKey, "trash", note.ID, string(payload), ConsumerIDFromContext(r.Context()),
 	); err != nil {
 		// Restore original note state to avoid permanently stuck pending_to_bear.
 		note.Trashed = oldTrashed

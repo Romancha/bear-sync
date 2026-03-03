@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -978,6 +979,110 @@ func TestGetAttachment_ServesFile(t *testing.T) {
 	body, err := io.ReadAll(getResp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, fileContent, string(body))
+}
+
+// --- Consumer ID propagation tests ---
+
+func TestCreateNote_QueueItemHasConsumerID(t *testing.T) {
+	s, err := store.NewSQLiteStore(":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	tokens := map[string]string{"myapp": "token-myapp"}
+	srv := api.NewServer(s, tokens, bridgeToken, t.TempDir())
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	body := map[string]string{"title": "Note", "body": "Content"}
+	resp := doRequest(t, ts, http.MethodPost, "/api/notes", body, "token-myapp",
+		map[string]string{"Idempotency-Key": "cid-create-1"})
+	defer resp.Body.Close() //nolint:errcheck // test
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	items, err := s.LeaseQueueItems(t.Context(), "test", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "myapp", items[0].ConsumerID)
+}
+
+func TestUpdateNote_QueueItemHasConsumerID(t *testing.T) {
+	s, err := store.NewSQLiteStore(":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	tokens := map[string]string{"openclaw": "token-oc"}
+	srv := api.NewServer(s, tokens, bridgeToken, t.TempDir())
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	bearID := "bear-upd-cid"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-cid-upd", Title: "Old", Body: "Old body", BearID: &bearID,
+	}))
+
+	body := map[string]string{"title": "New", "body": "New body"}
+	resp := doRequest(t, ts, http.MethodPut, "/api/notes/note-cid-upd", body, "token-oc",
+		map[string]string{"Idempotency-Key": "cid-update-1"})
+	defer resp.Body.Close() //nolint:errcheck // test
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	items, err := s.LeaseQueueItems(t.Context(), "test", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "openclaw", items[0].ConsumerID)
+}
+
+func TestTrashNote_QueueItemHasConsumerID(t *testing.T) {
+	s, err := store.NewSQLiteStore(":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	tokens := map[string]string{"external": "token-ext"}
+	srv := api.NewServer(s, tokens, bridgeToken, t.TempDir())
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	bearID := "bear-trash-cid"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-cid-trash", Title: "To Trash", BearID: &bearID,
+	}))
+
+	resp := doRequest(t, ts, http.MethodDelete, "/api/notes/note-cid-trash", nil, "token-ext",
+		map[string]string{"Idempotency-Key": "cid-trash-1"})
+	defer resp.Body.Close() //nolint:errcheck // test
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	items, err := s.LeaseQueueItems(t.Context(), "test", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "external", items[0].ConsumerID)
+}
+
+func TestAddTag_QueueItemHasConsumerID(t *testing.T) {
+	s, err := store.NewSQLiteStore(":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	tokens := map[string]string{"tagger": "token-tag"}
+	srv := api.NewServer(s, tokens, bridgeToken, t.TempDir())
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	bearID := "bear-tag-cid"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-cid-tag", Title: "Note", BearID: &bearID,
+	}))
+
+	body := map[string]string{"tag": "new-tag"}
+	resp := doRequest(t, ts, http.MethodPost, "/api/notes/note-cid-tag/tags", body, "token-tag",
+		map[string]string{"Idempotency-Key": "cid-tag-1"})
+	defer resp.Body.Close() //nolint:errcheck // test
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	items, err := s.LeaseQueueItems(t.Context(), "test", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "tagger", items[0].ConsumerID)
 }
 
 func TestSyncStatus_WithConflicts(t *testing.T) {
