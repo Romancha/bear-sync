@@ -495,7 +495,7 @@ func backlinkValues(b *models.Backlink) []any {
 var writeQueueColumnList = []string{
 	"id", "idempotency_key", "action", "note_id", "payload",
 	"created_at", "status", "processing_by", "lease_until",
-	"applied_at", "error",
+	"applied_at", "error", "consumer_id",
 }
 
 func writeQueueColumns() string {
@@ -523,13 +523,14 @@ type writeQueueScanner struct {
 	LeaseUntil     sql.NullString
 	AppliedAt      sql.NullString
 	Error          sql.NullString
+	ConsumerID     sql.NullString
 }
 
 func (ws *writeQueueScanner) dest() []any {
 	return []any{
 		&ws.ID, &ws.IdempotencyKey, &ws.Action, &ws.NoteID, &ws.Payload,
 		&ws.CreatedAt, &ws.Status, &ws.ProcessingBy, &ws.LeaseUntil,
-		&ws.AppliedAt, &ws.Error,
+		&ws.AppliedAt, &ws.Error, &ws.ConsumerID,
 	}
 }
 
@@ -546,6 +547,7 @@ func (ws *writeQueueScanner) toItem() models.WriteQueueItem {
 		LeaseUntil:     ws.LeaseUntil.String,
 		AppliedAt:      ws.AppliedAt.String,
 		Error:          ws.Error.String,
+		ConsumerID:     ws.ConsumerID.String,
 	}
 }
 

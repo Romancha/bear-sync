@@ -205,7 +205,8 @@ CREATE TABLE IF NOT EXISTS write_queue (
     processing_by   TEXT,
     lease_until     TEXT,
     applied_at      TEXT,
-    error           TEXT
+    error           TEXT,
+    consumer_id     TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS sync_meta (
     key   TEXT PRIMARY KEY,
@@ -1291,9 +1292,9 @@ func (s *SQLiteStore) EnqueueWrite(
 	}
 
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO write_queue (idempotency_key, action, note_id, payload)
-		VALUES (?, ?, ?, ?)`,
-		idempotencyKey, action, noteID, payload,
+		`INSERT INTO write_queue (idempotency_key, action, note_id, payload, consumer_id)
+		VALUES (?, ?, ?, ?, ?)`,
+		idempotencyKey, action, noteID, payload, consumerID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("enqueue write: %w", err)

@@ -64,12 +64,12 @@ Refactor bear-sync hub from being hardcoded to a single external consumer (openc
 - [x] run tests — must pass before next task
 
 ### Task 2: Migrate database schema — add consumer_id column to write_queue
-- [ ] write tests for schema migration: new `write_queue` table has `consumer_id TEXT NOT NULL DEFAULT ''` column
-- [ ] add `consumer_id TEXT NOT NULL DEFAULT ''` column to `write_queue` CREATE TABLE in `internal/store/sqlite.go`
-- [ ] update `EnqueueWrite` implementation to INSERT consumer_id value
-- [ ] update all write_queue scan/read queries to include consumer_id in SELECT and scan into `ConsumerID`
-- [ ] write tests for EnqueueWrite with consumer_id (verify stored and returned)
-- [ ] run tests — must pass before next task
+- [x] write tests for schema migration: new `write_queue` table has `consumer_id TEXT NOT NULL DEFAULT ''` column
+- [x] add `consumer_id TEXT NOT NULL DEFAULT ''` column to `write_queue` CREATE TABLE in `internal/store/sqlite.go`
+- [x] update `EnqueueWrite` implementation to INSERT consumer_id value
+- [x] update all write_queue scan/read queries to include consumer_id in SELECT and scan into `ConsumerID`
+- [x] write tests for EnqueueWrite with consumer_id (verify stored and returned)
+- [x] run tests — must pass before next task
 
 ### Task 3: Implement multi-consumer token parsing
 - [ ] write tests for token parsing: `"openclaw:token1,myapp:token2"` → `map[string]string{"openclaw":"token1","myapp":"token2"}`

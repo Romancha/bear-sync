@@ -714,6 +714,79 @@ func TestWriteQueue_FullLifecycle(t *testing.T) {
 	assert.Len(t, items, 0)
 }
 
+func TestWriteQueue_SchemaHasConsumerIDColumn(t *testing.T) {
+	s := newTestStore(t)
+
+	var colCount int
+	err := s.DB().QueryRow(
+		"SELECT count(*) FROM pragma_table_info('write_queue') WHERE name = 'consumer_id'",
+	).Scan(&colCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, colCount, "write_queue should have consumer_id column")
+
+	// Verify the default value by inserting without consumer_id and reading back.
+	_, err = s.DB().Exec(
+		"INSERT INTO write_queue (idempotency_key, action, payload) VALUES ('raw-key', 'create', '{}')",
+	)
+	require.NoError(t, err)
+
+	var consumerID string
+	err = s.DB().QueryRow("SELECT consumer_id FROM write_queue WHERE idempotency_key = 'raw-key'").Scan(&consumerID)
+	require.NoError(t, err)
+	assert.Equal(t, "", consumerID, "consumer_id default should be empty string")
+}
+
+func TestWriteQueue_EnqueueWithConsumerID(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	item, err := s.EnqueueWrite(ctx, "key-consumer", "create", "", `{"title":"Test"}`, "openclaw")
+	require.NoError(t, err)
+	assert.Equal(t, "openclaw", item.ConsumerID)
+	assert.Equal(t, "pending", item.Status)
+
+	// Verify via GetQueueItemByIdempotencyKey.
+	got, err := s.GetQueueItemByIdempotencyKey(ctx, "key-consumer")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "openclaw", got.ConsumerID)
+}
+
+func TestWriteQueue_EnqueueWithEmptyConsumerID(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	item, err := s.EnqueueWrite(ctx, "key-empty", "create", "", `{"title":"Test"}`, "")
+	require.NoError(t, err)
+	assert.Equal(t, "", item.ConsumerID)
+}
+
+func TestWriteQueue_LeaseReturnsConsumerID(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	_, err := s.EnqueueWrite(ctx, "key-lease-cid", "create", "", `{"title":"Test"}`, "myapp")
+	require.NoError(t, err)
+
+	items, err := s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "myapp", items[0].ConsumerID)
+}
+
+func TestWriteQueue_IdempotencyReturnsConsumerID(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	_, err := s.EnqueueWrite(ctx, "key-idem-cid", "create", "", `{"title":"Test"}`, "openclaw")
+	require.NoError(t, err)
+
+	// Second call with same key returns existing item with consumer_id.
+	item, err := s.EnqueueWrite(ctx, "key-idem-cid", "create", "", `{"title":"Test"}`, "openclaw")
+	require.NoError(t, err)
+	assert.Equal(t, "openclaw", item.ConsumerID)
+}
+
 // --- Sync Meta ---
 
 func TestSyncMeta(t *testing.T) {
