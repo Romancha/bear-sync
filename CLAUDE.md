@@ -1,6 +1,6 @@
 # bear-sync
 
-Monorepo with two Go binaries for syncing Bear notes with openclaw.
+Monorepo with two Go binaries for syncing Bear notes with external consumers.
 
 ## Project Structure
 
@@ -48,21 +48,23 @@ Monorepo with two Go binaries for syncing Bear notes with openclaw.
 ## Sync Architecture
 
 - Bear is source-of-truth for user content
-- Hub is read replica + write queue for openclaw
-- Write flow: openclaw → hub write_queue → bridge lease → xcall to Bear → ack
-- Read flow: Bear → bridge delta export → hub sync/push → openclaw API
-- Delivery: effectively-once (openclaw→hub), at-least-once (hub→bridge), duplicate-safe (bridge apply)
+- Hub is read replica + write queue for external consumers
+- Write flow: consumer → hub write_queue → bridge lease → xcall to Bear → ack
+- Read flow: Bear → bridge delta export → hub sync/push → consumer API
+- Delivery: effectively-once (consumer→hub), at-least-once (hub→bridge), duplicate-safe (bridge apply)
 
 ## Auth
 
-- Two Bearer tokens: one for openclaw (api/* scope), one for bridge (sync/* scope)
+- Multiple consumer Bearer tokens (api/* scope) configured via `HUB_CONSUMER_TOKENS`, plus one bridge token (sync/* scope)
+- Each consumer is identified by name and authenticated with its own token
+- Write queue items are attributed to the originating consumer via `consumer_id`
 - Encrypted notes are read-only (403 for write operations)
-- All mutating openclaw API requests (POST/PUT/DELETE) require an `Idempotency-Key` header; missing header returns HTTP 400
+- All mutating consumer API requests (POST/PUT/DELETE) require an `Idempotency-Key` header; missing header returns HTTP 400
 
 ## Note sync_status lifecycle
 
 - `synced`: normal state; Bear delta pushes overwrite hub fields freely
-- `pending_to_bear`: openclaw has enqueued a write; hub will NOT overwrite `title`/`body` from Bear delta pushes while in this state
+- `pending_to_bear`: a consumer has enqueued a write; hub will NOT overwrite `title`/`body` from Bear delta pushes while in this state
 - `conflict`: set when a Bear push arrives for a `pending_to_bear` note with a newer `modified_at`; bridge creates a `[Conflict] Title` note in Bear instead of applying the queue item
 - Transitions: `synced` → `pending_to_bear` (on enqueue) → `synced` (on ack with "applied") or `conflict` (on conflicting Bear push)
 

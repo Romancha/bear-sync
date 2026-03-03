@@ -1,13 +1,65 @@
 # bear-sync
 
-Syncs Bear notes with openclaw. Two components: **hub** (API server on VPS) and **bridge** (Mac agent that reads Bear SQLite).
+Syncs Bear notes with external consumers. Two components: **hub** (API server on VPS) and **bridge** (Mac agent that reads Bear SQLite).
 
 ## Architecture
 
-- Bear is source-of-truth for user content
-- Hub is a read replica with a write queue for openclaw
-- Read flow: Bear → bridge → hub → openclaw API
-- Write flow: openclaw → hub write_queue → bridge → Bear x-callback-url → ack
+### Components
+
+**Bear** — source of truth for all note content. Stores notes in a local SQLite database (Core Data schema). The bridge reads this database directly and applies writes via Bear's x-callback-url scheme.
+
+**Bridge** (`bin/bear-bridge`) — Mac agent that runs on the same machine as Bear. Runs once per invocation (scheduled via launchd). Reads Bear's SQLite, detects changes since the last run, pushes them to the hub, and pulls pending write operations from the hub to apply back to Bear via xcall.
+
+**Hub** (`bin/bear-sync-hub`) — API server that runs on a VPS. Acts as a read replica of Bear's notes and exposes a REST API for external consumers. Holds a write queue for consumer-initiated changes that need to propagate back to Bear.
+
+**Consumers** — external applications that read and write notes via the hub API. Each consumer is identified by name and authenticated with its own token. Multiple consumers can be configured simultaneously. Consumers communicate only with the hub; never touch Bear or the bridge directly.
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph mac["Mac (user's machine)"]
+        Bear["Bear.app\n(SQLite source of truth)"]
+        Bridge["bear-bridge\n(launchd, every 5 min)"]
+        xcall["xcall CLI\n(x-callback-url executor)"]
+    end
+
+    subgraph vps["VPS"]
+        Caddy["Caddy\n(TLS reverse proxy)"]
+        Hub["bear-sync-hub\n(REST API + SQLite)"]
+    end
+
+    Consumer["Consumer\n(API client)"]
+
+    Bridge -- "reads Bear SQLite\n(read-only)" --> Bear
+    Bridge -- "applies writes via\nbear:// URL scheme" --> xcall
+    xcall -- "x-callback-url" --> Bear
+    Bridge -- "POST /api/sync/push\n(bridge token)" --> Caddy
+    Bridge -- "GET /api/sync/queue\nPOST /api/sync/ack" --> Caddy
+    Caddy --> Hub
+    Consumer -- "GET/POST/PUT/DELETE /api/notes/\n(consumer token)" --> Caddy
+```
+
+### Note `sync_status` State Machine
+
+The `sync_status` field on each hub note guards against write conflicts between consumers and Bear.
+
+```mermaid
+stateDiagram-v2
+    synced: synced\n(normal state)
+    pending: pending_to_bear\n(consumer write queued)
+    conflict: conflict\n(Bear changed while write pending)
+
+    [*] --> synced: Bear push (initial/delta)
+
+    synced --> pending: consumer enqueues write\n(POST/PUT/DELETE)
+    pending --> synced: bridge ACKs applied
+    pending --> conflict: Bear push arrives\nwith newer modified_at
+
+    conflict --> synced: bridge creates [Conflict] note\nand ACKs conflict_resolved=true
+```
+
+While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`body` on the hub. If Bear modifies the note before the bridge ACKs, the hub detects a conflict and the bridge creates a `[Conflict] Title` note in Bear instead of overwriting.
 
 ## Prerequisites
 
@@ -32,7 +84,7 @@ Binaries are placed in `bin/bear-sync-hub` and `bin/bear-bridge`.
 | `HUB_HOST` | No | `127.0.0.1` | Listen host (`0.0.0.0` for Docker) |
 | `HUB_PORT` | No | `8080` | Listen port |
 | `HUB_DB_PATH` | Yes | — | Path to SQLite database file |
-| `HUB_OPENCLAW_TOKEN` | Yes | — | Bearer token for openclaw API access |
+| `HUB_CONSUMER_TOKENS` | Yes | — | Consumer tokens in `name:token` format, comma-separated (e.g. `openclaw:secret1,myapp:secret2`) |
 | `HUB_BRIDGE_TOKEN` | Yes | — | Bearer token for bridge sync access |
 | `HUB_ATTACHMENTS_DIR` | No | `attachments` | Directory for attachment file storage |
 
@@ -40,7 +92,7 @@ Binaries are placed in `bin/bear-sync-hub` and `bin/bear-bridge`.
 
 ```
 export HUB_DB_PATH=/opt/bear-sync/data/hub.db
-export HUB_OPENCLAW_TOKEN=<token>
+export HUB_CONSUMER_TOKENS="openclaw:secret1,myapp:secret2"
 export HUB_BRIDGE_TOKEN=<token>
 ./bin/bear-sync-hub
 ```
@@ -68,7 +120,7 @@ cp .env.example .env
 2. Set your domain in `.env`:
 
 ```
-HUB_OPENCLAW_TOKEN=<token>
+HUB_CONSUMER_TOKENS="openclaw:secret1,myapp:secret2"
 HUB_BRIDGE_TOKEN=<token>
 DOMAIN=bear-sync.example.com
 ```

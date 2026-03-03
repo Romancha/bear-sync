@@ -125,9 +125,9 @@ Refactor bear-sync hub from being hardcoded to a single external consumer (openc
 - [x] run tests with race detector: `make test-race`
 
 ### Task 10: Update documentation
-- [ ] update `CLAUDE.md` — replace openclaw references with generic consumer terminology
-- [ ] update `README.md` — document `HUB_CONSUMER_TOKENS` env var format and multi-consumer setup
-- [ ] update deploy configs if they reference `HUB_OPENCLAW_TOKEN`
+- [x] update `CLAUDE.md` — replace openclaw references with generic consumer terminology
+- [x] update `README.md` — document `HUB_CONSUMER_TOKENS` env var format and multi-consumer setup
+- [x] update deploy configs if they reference `HUB_OPENCLAW_TOKEN`
 
 ## Technical Details
 
