@@ -1276,7 +1276,7 @@ func (s *SQLiteStore) GetQueueItemByIdempotencyKey(ctx context.Context, key stri
 
 func (s *SQLiteStore) EnqueueWrite(
 	ctx context.Context,
-	idempotencyKey, action, noteID, payload string,
+	idempotencyKey, action, noteID, payload, consumerID string,
 ) (*models.WriteQueueItem, error) {
 	existing, err := scanWriteQueueRow(s.db.QueryRowContext(ctx,
 		"SELECT "+writeQueueColumns()+" FROM write_queue WHERE idempotency_key = ?",

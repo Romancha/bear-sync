@@ -648,7 +648,7 @@ func TestSyncQueue_WithItems(t *testing.T) {
 
 	require.NoError(t, s.CreateNote(t.Context(), &models.Note{ID: "note-1", Title: "Note"}))
 
-	_, err := s.EnqueueWrite(t.Context(), "idem-1", "update", "note-1", `{"body":"new"}`)
+	_, err := s.EnqueueWrite(t.Context(), "idem-1", "update", "note-1", `{"body":"new"}`, "")
 	require.NoError(t, err)
 
 	resp := doRequest(t, ts, http.MethodGet, "/api/sync/queue", nil, bridgeToken, nil)
@@ -666,7 +666,7 @@ func TestSyncAck(t *testing.T) {
 		ID: "note-1", Title: "Note", SyncStatus: "pending_to_bear",
 	}))
 
-	_, err := s.EnqueueWrite(t.Context(), "idem-1", "create", "note-1", `{"title":"Note"}`)
+	_, err := s.EnqueueWrite(t.Context(), "idem-1", "create", "note-1", `{"title":"Note"}`, "")
 	require.NoError(t, err)
 
 	ackReq := models.SyncAckRequest{

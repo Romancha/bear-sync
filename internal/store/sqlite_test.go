@@ -552,13 +552,13 @@ func TestWriteQueue_EnqueueAndIdempotency(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	item1, err := s.EnqueueWrite(ctx, "key-1", "create", "n1", `{"title":"New"}`)
+	item1, err := s.EnqueueWrite(ctx, "key-1", "create", "n1", `{"title":"New"}`, "")
 	require.NoError(t, err)
 	assert.Equal(t, "pending", item1.Status)
 	assert.Equal(t, "create", item1.Action)
 
 	// Same idempotency key → return existing, no duplicate.
-	item2, err := s.EnqueueWrite(ctx, "key-1", "create", "n1", `{"title":"New"}`)
+	item2, err := s.EnqueueWrite(ctx, "key-1", "create", "n1", `{"title":"New"}`, "")
 	require.NoError(t, err)
 	assert.Equal(t, item1.ID, item2.ID)
 }
@@ -567,7 +567,7 @@ func TestWriteQueue_LeaseAndExpiry(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	_, err := s.EnqueueWrite(ctx, "key-1", "create", "", `{"title":"New"}`)
+	_, err := s.EnqueueWrite(ctx, "key-1", "create", "", `{"title":"New"}`, "")
 	require.NoError(t, err)
 
 	// Lease items.
@@ -587,7 +587,7 @@ func TestWriteQueue_LeaseExpiry(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	_, err := s.EnqueueWrite(ctx, "key-exp", "update", "n1", `{"body":"new"}`)
+	_, err := s.EnqueueWrite(ctx, "key-exp", "update", "n1", `{"body":"new"}`, "")
 	require.NoError(t, err)
 
 	// Lease items.
@@ -614,7 +614,7 @@ func TestWriteQueue_AckApplied(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	item, err := s.EnqueueWrite(ctx, "key-ack", "create", "n1", `{"title":"Created"}`)
+	item, err := s.EnqueueWrite(ctx, "key-ack", "create", "n1", `{"title":"Created"}`, "")
 	require.NoError(t, err)
 
 	// Lease.
@@ -651,7 +651,7 @@ func TestWriteQueue_AckApplied_FillsBearID(t *testing.T) {
 		SyncStatus: "pending_to_bear",
 	}))
 
-	item, err := s.EnqueueWrite(ctx, "key-fill", "create", "n-new", `{"title":"New Note"}`)
+	item, err := s.EnqueueWrite(ctx, "key-fill", "create", "n-new", `{"title":"New Note"}`, "")
 	require.NoError(t, err)
 
 	_, err = s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
@@ -675,7 +675,7 @@ func TestWriteQueue_AckFailed(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	item, err := s.EnqueueWrite(ctx, "key-fail", "trash", "n1", `{}`)
+	item, err := s.EnqueueWrite(ctx, "key-fail", "trash", "n1", `{}`, "")
 	require.NoError(t, err)
 
 	_, err = s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
@@ -692,7 +692,7 @@ func TestWriteQueue_FullLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	// Enqueue.
-	item, err := s.EnqueueWrite(ctx, "lifecycle-key", "update", "n1", `{"body":"new"}`)
+	item, err := s.EnqueueWrite(ctx, "lifecycle-key", "update", "n1", `{"body":"new"}`, "")
 	require.NoError(t, err)
 	assert.Equal(t, "pending", item.Status)
 
@@ -956,7 +956,7 @@ func TestLeaseQueueItems_IncludesNoteSyncStatus(t *testing.T) {
 	}))
 
 	// Enqueue a write for the conflicted note.
-	_, err := s.EnqueueWrite(ctx, "idem-1", "update", "n1", `{"body":"new body"}`)
+	_, err := s.EnqueueWrite(ctx, "idem-1", "update", "n1", `{"body":"new body"}`, "")
 	require.NoError(t, err)
 
 	// Lease and verify sync_status is included.
