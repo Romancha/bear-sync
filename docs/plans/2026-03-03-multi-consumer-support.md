@@ -87,11 +87,11 @@ Refactor bear-sync hub from being hardcoded to a single external consumer (openc
 - [x] run tests — must pass before next task
 
 ### Task 5: Update hub main.go — env var migration
-- [ ] write tests for config validation: `HUB_CONSUMER_TOKENS` required, parsed correctly
-- [ ] replace `HUB_OPENCLAW_TOKEN` env var with `HUB_CONSUMER_TOKENS` in `cmd/hub/main.go`
-- [ ] update Server constructor call to pass parsed `map[string]string`
-- [ ] update startup log messages to list registered consumer names (not tokens)
-- [ ] run tests — must pass before next task
+- [x] write tests for config validation: `HUB_CONSUMER_TOKENS` required, parsed correctly
+- [x] replace `HUB_OPENCLAW_TOKEN` env var with `HUB_CONSUMER_TOKENS` in `cmd/hub/main.go`
+- [x] update Server constructor call to pass parsed `map[string]string`
+- [x] update startup log messages to list registered consumer names (not tokens)
+- [x] run tests — must pass before next task
 
 ### Task 6: Pass consumer_id through API handlers to write queue
 - [ ] write tests: POST /api/notes creates queue item with correct consumer_id from auth context

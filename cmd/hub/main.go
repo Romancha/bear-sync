@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,7 +29,7 @@ type config struct {
 	host           string
 	port           string
 	dbPath         string
-	openclawToken  string
+	consumerTokens map[string]string
 	bridgeToken    string
 	attachmentsDir string
 }
@@ -37,7 +39,6 @@ func loadConfig() (*config, error) {
 		host:           os.Getenv("HUB_HOST"),
 		port:           os.Getenv("HUB_PORT"),
 		dbPath:         os.Getenv("HUB_DB_PATH"),
-		openclawToken:  os.Getenv("HUB_OPENCLAW_TOKEN"),
 		bridgeToken:    os.Getenv("HUB_BRIDGE_TOKEN"),
 		attachmentsDir: os.Getenv("HUB_ATTACHMENTS_DIR"),
 	}
@@ -54,9 +55,17 @@ func loadConfig() (*config, error) {
 		return nil, fmt.Errorf("HUB_DB_PATH is required")
 	}
 
-	if cfg.openclawToken == "" {
-		return nil, fmt.Errorf("HUB_OPENCLAW_TOKEN is required")
+	rawTokens := os.Getenv("HUB_CONSUMER_TOKENS")
+	if rawTokens == "" {
+		return nil, fmt.Errorf("HUB_CONSUMER_TOKENS is required")
 	}
+
+	consumerTokens, err := api.ParseConsumerTokens(rawTokens)
+	if err != nil {
+		return nil, fmt.Errorf("parse HUB_CONSUMER_TOKENS: %w", err)
+	}
+
+	cfg.consumerTokens = consumerTokens
 
 	if cfg.bridgeToken == "" {
 		return nil, fmt.Errorf("HUB_BRIDGE_TOKEN is required")
@@ -90,8 +99,7 @@ func run() error {
 		}
 	}()
 
-	consumerTokens := map[string]string{"openclaw": cfg.openclawToken}
-	srv := api.NewServer(s, consumerTokens, cfg.bridgeToken, cfg.attachmentsDir)
+	srv := api.NewServer(s, cfg.consumerTokens, cfg.bridgeToken, cfg.attachmentsDir)
 
 	addr := net.JoinHostPort(cfg.host, cfg.port)
 
@@ -107,6 +115,13 @@ func run() error {
 	defer stop()
 
 	errCh := make(chan error, 1)
+
+	consumerNames := make([]string, 0, len(cfg.consumerTokens))
+	for name := range cfg.consumerTokens {
+		consumerNames = append(consumerNames, name)
+	}
+	sort.Strings(consumerNames)
+	slog.Info("registered consumers", "consumers", strings.Join(consumerNames, ", "))
 
 	go func() {
 		slog.Info("starting hub server", "addr", addr)

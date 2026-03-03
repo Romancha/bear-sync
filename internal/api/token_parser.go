@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-// parseConsumerTokens parses a comma-separated string of "name:token" pairs
+// ParseConsumerTokens parses a comma-separated string of "name:token" pairs
 // into a map of consumer name to token. The expected format is:
 //
 //	"openclaw:secret1,myapp:secret2,another:secret3"
-func parseConsumerTokens(raw string) (map[string]string, error) {
+func ParseConsumerTokens(raw string) (map[string]string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, fmt.Errorf("no consumer tokens configured")

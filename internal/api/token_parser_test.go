@@ -78,7 +78,7 @@ func TestParseConsumerTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseConsumerTokens(tt.raw)
+			got, err := ParseConsumerTokens(tt.raw)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Equal(t, tt.wantErr, err.Error())
