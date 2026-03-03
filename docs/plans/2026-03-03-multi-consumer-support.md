@@ -117,12 +117,12 @@ Refactor bear-sync hub from being hardcoded to a single external consumer (openc
 - [x] run tests — must pass before next task
 
 ### Task 9: Verify acceptance criteria
-- [ ] verify multiple consumers can authenticate with different tokens
-- [ ] verify write queue items are attributed to correct consumer
-- [ ] verify bridge processes queue items from any consumer
-- [ ] run full test suite: `make test`
-- [ ] run linter: `make lint`
-- [ ] run tests with race detector: `make test-race`
+- [x] verify multiple consumers can authenticate with different tokens
+- [x] verify write queue items are attributed to correct consumer
+- [x] verify bridge processes queue items from any consumer
+- [x] run full test suite: `make test`
+- [x] run linter: `make lint`
+- [x] run tests with race detector: `make test-race`
 
 ### Task 10: Update documentation
 - [ ] update `CLAUDE.md` — replace openclaw references with generic consumer terminology
