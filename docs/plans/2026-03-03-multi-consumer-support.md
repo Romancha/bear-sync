@@ -72,10 +72,10 @@ Refactor bear-sync hub from being hardcoded to a single external consumer (openc
 - [x] run tests — must pass before next task
 
 ### Task 3: Implement multi-consumer token parsing
-- [ ] write tests for token parsing: `"openclaw:token1,myapp:token2"` → `map[string]string{"openclaw":"token1","myapp":"token2"}`
-- [ ] write tests for edge cases: empty string, single consumer, whitespace trimming, missing colon (error)
-- [ ] implement `parseConsumerTokens(raw string) (map[string]string, error)` in `internal/api/server.go`
-- [ ] run tests — must pass before next task
+- [x] write tests for token parsing: `"openclaw:token1,myapp:token2"` → `map[string]string{"openclaw":"token1","myapp":"token2"}`
+- [x] write tests for edge cases: empty string, single consumer, whitespace trimming, missing colon (error)
+- [x] implement `parseConsumerTokens(raw string) (map[string]string, error)` in `internal/api/server.go`
+- [x] run tests — must pass before next task
 
 ### Task 4: Refactor auth middleware for multi-consumer support
 - [ ] write tests for new auth middleware: valid consumer token → request proceeds with consumer_id in context; invalid token → 403; missing header → 401
