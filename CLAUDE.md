@@ -16,6 +16,7 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - internal/xcallback/ — Bear x-callback-url executor via bear-xcall CLI (bridge only)
 - tools/bear-xcall/ — Swift CLI source for bear-xcall .app bundle (macOS only, bridge dependency)
 - deploy/ — deployment configs (systemd unit, launchd plist, Caddyfile)
+- docs/ — consumer-facing documentation (API quick start guide)
 - testdata/ — test fixtures (test Bear SQLite)
 
 ## Commands
@@ -43,6 +44,7 @@ Run these checks before committing (in order):
 5. `make test-coverage` — ensure coverage does not decrease compared to the main branch
 6. `make tidy` — update go.mod/go.sum if dependencies changed
 7. If interfaces changed: `make generate` — regenerate mocks
+8. If swag annotations changed: `make swagger` — regenerate OpenAPI spec
 
 ## Code Patterns
 

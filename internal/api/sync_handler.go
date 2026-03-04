@@ -274,6 +274,7 @@ type syncStatusResponse struct {
 // @Produce json
 // @Success 200 {object} syncStatusResponse
 // @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Security BearerAuth
 // @Router /api/sync/status [get]

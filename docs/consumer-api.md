@@ -78,7 +78,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 ```
 
 Request body:
-- `title` (string) — note title
+- `title` (string, required) — note title
 - `body` (string) — note body (Markdown)
 - `tags` (string array, optional) — tags to assign
 
@@ -98,6 +98,8 @@ Request body:
 - `title` (string, optional) — new title
 - `body` (string, required) — new body
 
+Returns HTTP 200 with the updated note.
+
 Constraints:
 - Cannot update encrypted notes (403)
 - Cannot update notes not yet synced to Bear (409)
@@ -111,7 +113,7 @@ curl -X DELETE -H "Authorization: Bearer $TOKEN" \
   "$HUB_URL/api/notes/<note-id>"
 ```
 
-Moves the note to trash in Bear. Same constraints as update.
+Moves the note to trash in Bear. Returns HTTP 200 with the updated note. Same constraints as update.
 
 ### Archive Note
 
@@ -121,7 +123,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
   "$HUB_URL/api/notes/<note-id>/archive"
 ```
 
-Archives the note in Bear. Same constraints as update.
+Archives the note in Bear. Returns HTTP 200 with the updated note. Same constraints as update.
 
 ### Add File to Note
 
@@ -153,6 +155,8 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
   "$HUB_URL/api/notes/<note-id>/tags"
 ```
 
+Returns HTTP 201 with the write queue item.
+
 ### Rename Tag
 
 ```bash
@@ -163,6 +167,8 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" \
   "$HUB_URL/api/tags/<tag-id>"
 ```
 
+Returns HTTP 202 with the write queue item.
+
 ### Delete Tag
 
 ```bash
@@ -170,6 +176,8 @@ curl -X DELETE -H "Authorization: Bearer $TOKEN" \
   -H "Idempotency-Key: $(uuidgen)" \
   "$HUB_URL/api/tags/<tag-id>"
 ```
+
+Returns HTTP 202 with the write queue item.
 
 ### Get Attachment
 

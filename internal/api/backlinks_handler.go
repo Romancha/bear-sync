@@ -16,6 +16,7 @@ import (
 // @Param noteID path string true "Note ID"
 // @Success 200 {array} models.Backlink
 // @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Security BearerAuth

@@ -115,6 +115,7 @@ func TestHealthCheck(t *testing.T) {
 	defer resp.Body.Close() //nolint:errcheck // test
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, resp.Header.Get("Content-Type"), "application/json")
 
 	var body map[string]string
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))

@@ -293,7 +293,7 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 
 type updateNoteRequest struct {
 	Title string `json:"title,omitempty" example:"Updated Title"`
-	Body  string `json:"body,omitempty" example:"# Updated Content\nNew body text."`
+	Body  string `json:"body" example:"# Updated Content\nNew body text."`
 }
 
 // updateNote godoc

@@ -21,6 +21,7 @@ const fallbackFilename = "file"
 // @Param id path string true "Attachment ID"
 // @Success 200 {file} binary
 // @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Security BearerAuth

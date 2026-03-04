@@ -138,8 +138,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string
 // @Router /healthz [get]
 func (s *Server) healthCheck(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // --- Middleware ---
@@ -251,7 +250,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
+	writeJSON(w, status, ErrorResponse{Error: message})
 }
 
 func writeInternalError(w http.ResponseWriter, msg string, err error) {
