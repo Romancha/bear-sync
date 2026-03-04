@@ -3,6 +3,7 @@ package xcallback
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -49,6 +50,12 @@ func (e *defaultExecutor) Run(ctx context.Context, name string, args ...string) 
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // name is xcall path validated at init
 	out, err := cmd.Output()
 	if err != nil {
+		// bear-xcall writes structured error JSON to stdout even on non-zero exit.
+		// Return stdout if available so the caller can parse Bear error details.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(out) > 0 {
+			return out, nil
+		}
 		return nil, fmt.Errorf("exec %s: %w", name, err)
 	}
 	return out, nil
@@ -101,25 +108,22 @@ func New(opts ...Option) (*Xcall, error) {
 	return x, nil
 }
 
-// resolveBearXcallPath finds the bear-xcall binary inside the .app bundle.
-// It first checks next to the running executable, then falls back to PATH.
+// resolveBearXcallPath finds the bear-xcall binary inside the .app bundle
+// next to the running executable. The .app bundle structure is required for
+// macOS LaunchServices to route bear-xcall:// callback URLs.
 func resolveBearXcallPath() (string, error) {
-	// Try next to the running executable (e.g., bin/bear-xcall.app/Contents/MacOS/bear-xcall).
 	exe, err := os.Executable()
-	if err == nil {
-		binDir := filepath.Dir(exe)
-		appBinary := filepath.Join(binDir, "bear-xcall.app", "Contents", "MacOS", "bear-xcall")
-		if _, err := os.Stat(appBinary); err == nil {
-			return appBinary, nil
-		}
+	if err != nil {
+		return "", fmt.Errorf("cannot determine executable path: %w", err)
 	}
 
-	// Fallback: look for bear-xcall in PATH.
-	path, err := exec.LookPath("bear-xcall")
-	if err != nil {
-		return "", fmt.Errorf("bear-xcall.app not found next to executable and not in PATH: %w", err)
+	binDir := filepath.Dir(exe)
+	appBinary := filepath.Join(binDir, "bear-xcall.app", "Contents", "MacOS", "bear-xcall")
+	if _, err := os.Stat(appBinary); err != nil {
+		return "", fmt.Errorf("bear-xcall.app not found at %s (run 'make build-xcall'): %w", filepath.Join(binDir, "bear-xcall.app"), err)
 	}
-	return path, nil
+
+	return appBinary, nil
 }
 
 // NewWithPath creates a new Xcall instance with an explicit path (skips LookPath).

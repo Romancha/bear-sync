@@ -64,8 +64,9 @@ While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`b
 ## Prerequisites
 
 - Go 1.24+
+- Xcode Command Line Tools (for building bear-xcall on macOS; provides `swiftc`)
 - Bear.app (for bridge)
-- bear-xcall CLI (built via `make build-xcall`, for bridge write operations)
+- bear-xcall CLI (built via `make build-xcall`, for bridge write operations; source in `tools/bear-xcall/`)
 
 ## Build
 
@@ -196,6 +197,8 @@ xcaddy build --with github.com/mholt/caddy-ratelimit
 ```
 make test          # run all tests
 make test-race     # run tests with race detector
+make test-xcall    # run bear-xcall manual tests (macOS + Bear)
+make build-xcall   # build bear-xcall .app bundle (macOS only)
 make lint          # run golangci-lint
 make fmt           # format code
 make tidy          # go mod tidy

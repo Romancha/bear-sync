@@ -76,11 +76,6 @@ class XCallbackHandler: NSObject {
     private let timeout: TimeInterval
     private var timeoutTimer: Timer?
 
-    override init() {
-        self.timeout = 10
-        super.init()
-    }
-
     init(timeout: TimeInterval) {
         self.timeout = timeout
         super.init()
@@ -109,7 +104,8 @@ class XCallbackHandler: NSObject {
 
         NSWorkspace.shared.open(url)
 
-        // Start timeout timer.
+        // Start timeout timer. Write timeout error to stdout (same format as Bear error responses)
+        // so the Go caller can parse the structured error via parseXcallResult.
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { _ in
             let errorJSON: [String: Any] = [
                 "errorCode": -1,
@@ -118,7 +114,7 @@ class XCallbackHandler: NSObject {
             if let data = try? JSONSerialization.data(withJSONObject: errorJSON),
                let str = String(data: data, encoding: .utf8)
             {
-                FileHandle.standardError.write(Data((str + "\n").utf8))
+                print(str)
             }
             exit(2)
         }
@@ -134,7 +130,7 @@ class XCallbackHandler: NSObject {
             exit(1)
         }
 
-        let isError = url.path.contains("error")
+        let isError = url.path == "/error"
 
         // Parse query parameters into a dictionary.
         var result: [String: String] = [:]
@@ -154,19 +150,19 @@ class XCallbackHandler: NSObject {
             jsonObject["errorCode"] = errorCode
         }
 
+        // Write all responses to stdout so the Go caller can parse structured
+        // error details via parseXcallResult (drop-in replacement for xcall).
         do {
             let data = try JSONSerialization.data(
                 withJSONObject: jsonObject,
                 options: [.sortedKeys]
             )
             if let str = String(data: data, encoding: .utf8) {
-                if isError {
-                    FileHandle.standardError.write(Data((str + "\n").utf8))
-                    exit(1)
-                } else {
-                    print(str)
-                    exit(0)
-                }
+                print(str)
+                exit(isError ? 1 : 0)
+            } else {
+                writeError("Failed to encode response as UTF-8")
+                exit(1)
             }
         } catch {
             writeError("Failed to serialize response: \(error)")

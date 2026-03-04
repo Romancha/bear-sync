@@ -52,10 +52,12 @@ func runBearXcall(_ arguments: [String]) throws -> ProcessResult {
     process.standardError = stderrPipe
 
     try process.run()
-    process.waitUntilExit()
 
+    // Read pipes before waiting to avoid deadlock if output fills pipe buffer.
     let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
     let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+    process.waitUntilExit()
 
     return ProcessResult(
         exitCode: process.terminationStatus,
@@ -234,10 +236,12 @@ func runBearXcallApp(_ arguments: [String]) throws -> ProcessResult {
     process.standardError = stderrPipe
 
     try process.run()
-    process.waitUntilExit()
 
+    // Read pipes before waiting to avoid deadlock if output fills pipe buffer.
     let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
     let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+    process.waitUntilExit()
 
     return ProcessResult(
         exitCode: process.terminationStatus,
@@ -346,8 +350,9 @@ func runErrorTests() {
         guard r.exitCode == 1 else {
             return .failed("expected exit code 1, got \(r.exitCode)")
         }
-        guard let json = parseJSON(r.stderr) else {
-            return .failed("expected JSON error in stderr, got: \(r.stderr)")
+        // Error JSON is written to stdout (for Go caller compatibility).
+        guard let json = parseJSON(r.stdout) else {
+            return .failed("expected JSON error in stdout, got: \(r.stdout)")
         }
         guard json["errorCode"] != nil else {
             return .failed("missing errorCode in error response")
