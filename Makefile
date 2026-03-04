@@ -131,6 +131,7 @@ ifeq ($(shell uname),Darwin)
 	@mkdir -p $(BRIDGE_CONFIG_DIR)
 	cp bin/$(BINARY_BRIDGE) $(BRIDGE_BIN_DIR)/
 	cp -R bin/bear-xcall.app $(BRIDGE_BIN_DIR)/
+	xattr -dr com.apple.quarantine $(BRIDGE_BIN_DIR)/bear-xcall.app
 	cp deploy/bear-bridge-wrapper.sh $(BRIDGE_BIN_DIR)/
 	chmod +x $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
 	@if [ ! -f $(BRIDGE_CONFIG_DIR)/.env.bridge ]; then \
