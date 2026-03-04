@@ -43,19 +43,19 @@
 - [x] Run tests — must pass before next task
 
 ### Task 2: Create GitHub Actions release workflow for bridge
-- [ ] Create `.github/workflows/release-bridge.yml` triggered on `v*` tags
-- [ ] Job runs on `macos-latest` (required for Swift compilation and code signing)
-- [ ] Steps: checkout, setup Go 1.26, build bridge binary with version from tag
-- [ ] Steps: compile bear-xcall.app via `swiftc` (same as Makefile build-xcall)
-- [ ] Steps: create release archive — `bear-bridge-darwin-arm64.tar.gz` containing:
+- [x] Create `.github/workflows/release-bridge.yml` triggered on `v*` tags
+- [x] Job runs on `macos-latest` (required for Swift compilation and code signing)
+- [x] Steps: checkout, setup Go 1.26, build bridge binary with version from tag
+- [x] Steps: compile bear-xcall.app via `swiftc` (same as Makefile build-xcall)
+- [x] Steps: create release archive — `bear-bridge-darwin-arm64.tar.gz` containing:
   - `bin/bear-bridge`
   - `bin/bear-xcall.app/` (full bundle)
   - `deploy/com.romancha.bear-bridge.plist`
   - `deploy/bear-bridge-wrapper.sh`
   - `deploy/.env.bridge.example`
   - `Makefile` (for `make install-bridge`)
-- [ ] Steps: upload archive as artifact (for use in later signing step)
-- [ ] Verify workflow syntax with `actionlint` or similar
+- [x] Steps: upload archive as artifact (for use in later signing step)
+- [x] Verify workflow syntax with `actionlint` or similar
 
 ### Task 3: Add code signing and notarization to release workflow
 - [ ] Add GitHub secrets documentation/checklist:
