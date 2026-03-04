@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 	"testing"
@@ -13,19 +14,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockExecutor records calls and returns preconfigured responses.
-type mockExecutor struct {
-	calls   []executorCall
-	output  []byte
-	err     error
-	outputs [][]byte // for sequential calls
-	errs    []error
-	callIdx int
-}
-
 type executorCall struct {
 	Name string
 	Args []string
+}
+
+// mockExecutor records calls and returns preconfigured responses.
+type mockExecutor struct {
+	calls     []executorCall
+	output    []byte
+	err       error
+	outputs   [][]byte // for sequential calls
+	errs      []error
+	callIdx   int
+	lastStdin []byte // captured stdin from RunWithStdin
 }
 
 func (m *mockExecutor) Run(_ context.Context, name string, args ...string) ([]byte, error) {
@@ -42,6 +44,13 @@ func (m *mockExecutor) Run(_ context.Context, name string, args ...string) ([]by
 		}
 	}
 	return m.output, m.err
+}
+
+func (m *mockExecutor) RunWithStdin(_ context.Context, stdin io.Reader, name string, args ...string) ([]byte, error) {
+	if stdin != nil {
+		m.lastStdin, _ = io.ReadAll(stdin)
+	}
+	return m.Run(context.Background(), name, args...)
 }
 
 func newTestXcall(executor *mockExecutor) *Xcall {
@@ -360,7 +369,11 @@ func TestAddFile(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, executor.calls, 1)
 
-		callURL := executor.calls[0].Args[1]
+		// AddFile uses RunWithStdin with "-url -" to bypass ARG_MAX for large URLs.
+		assert.Equal(t, []string{"-url", "-"}, executor.calls[0].Args)
+
+		// The actual URL is piped via stdin.
+		callURL := string(executor.lastStdin)
 		assert.True(t, strings.HasPrefix(callURL, "bear://x-callback-url/add-file?"))
 
 		parsed, err := url.Parse(callURL)

@@ -510,9 +510,9 @@ func TestProcessQueue_ConflictWithTitleInPayload(t *testing.T) {
 			{
 				ID:             21,
 				IdempotencyKey: "idem-21",
-				Action:         "create",
-				NoteID:         "",
-				Payload:        `{"title":"New Note","body":"consumer body","tags":["tag1"]}`,
+				Action:         "update",
+				NoteID:         "hub-note-1",
+				Payload:        `{"title":"New Note","body":"consumer body"}`,
 				NoteSyncStatus: "conflict",
 			},
 		},

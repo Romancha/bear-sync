@@ -104,7 +104,8 @@ func (b *Bridge) applyQueueItem(ctx context.Context, item *models.WriteQueueItem
 	}
 
 	// Skip items for notes with sync_status=conflict — create a conflict copy instead.
-	if item.NoteSyncStatus == "conflict" {
+	// Only check for note-targeted actions (rename_tag/delete_tag have empty NoteID).
+	if item.NoteID != "" && item.NoteSyncStatus == "conflict" {
 		b.handleConflictItem(ctx, item, &ack)
 		return ack
 	}

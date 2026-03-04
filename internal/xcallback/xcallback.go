@@ -1,11 +1,13 @@
 package xcallback
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -71,12 +73,26 @@ func (e *BearError) Error() string {
 // CommandExecutor abstracts os/exec for testing.
 type CommandExecutor interface {
 	Run(ctx context.Context, name string, args ...string) ([]byte, error)
+	// RunWithStdin runs a command with the given stdin data piped to the process.
+	// Used by AddFile to bypass macOS ARG_MAX (1 MB) when passing large base64-encoded URLs.
+	RunWithStdin(ctx context.Context, stdin io.Reader, name string, args ...string) ([]byte, error)
 }
 
 type defaultExecutor struct{}
 
 func (e *defaultExecutor) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return e.runCmd(ctx, nil, name, args...)
+}
+
+func (e *defaultExecutor) RunWithStdin(ctx context.Context, stdin io.Reader, name string, args ...string) ([]byte, error) {
+	return e.runCmd(ctx, stdin, name, args...)
+}
+
+func (e *defaultExecutor) runCmd(ctx context.Context, stdin io.Reader, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // name is bear-xcall path validated at init
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		// bear-xcall writes structured error JSON to stdout even on non-zero exit.
@@ -323,9 +339,11 @@ func (x *Xcall) AddFile(ctx context.Context, token, bearID, filename string, fil
 
 	callURL := "bear://x-callback-url/add-file?" + params.Encode()
 
-	x.logger.Debug("executing bear-xcall add-file", "url", MaskToken(callURL), "bear_id", bearID, "filename", filename)
+	x.logger.Debug("executing bear-xcall add-file", "bear_id", bearID, "filename", filename, "url_len", len(callURL))
 
-	output, err := x.executor.Run(ctx, x.xcallPath, "-url", callURL)
+	// Pipe URL via stdin ("-url -") to bypass macOS ARG_MAX (1 MB) limit.
+	// A 5 MB file produces ~6.7 MB of base64 in the URL, far exceeding ARG_MAX.
+	output, err := x.executor.RunWithStdin(ctx, bytes.NewReader([]byte(callURL)), x.xcallPath, "-url", "-")
 	if err != nil {
 		return fmt.Errorf("bear-xcall add-file: %w", err)
 	}

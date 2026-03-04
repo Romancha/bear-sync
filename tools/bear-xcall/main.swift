@@ -13,7 +13,7 @@ func printUsage() {
         Usage: bear-xcall -url <bear://x-callback-url/...> [-timeout <seconds>]
 
         Options:
-          -url       Bear x-callback-url to execute (required)
+          -url       Bear x-callback-url to execute (required; use "-" to read from stdin)
           -timeout   Timeout in seconds (default: 10)
           --help     Show this help message
         """
@@ -56,10 +56,22 @@ func parseArgs() -> Config? {
         i += 1
     }
 
-    guard let url = urlValue else {
+    guard var url = urlValue else {
         FileHandle.standardError.write(Data("Error: -url is required\n".utf8))
         printUsage()
         return nil
+    }
+
+    // Read URL from stdin when "-" is passed, to bypass ARG_MAX for large URLs (e.g. add-file with base64 data).
+    if url == "-" {
+        let stdinData = FileHandle.standardInput.readDataToEndOfFile()
+        guard let stdinURL = String(data: stdinData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !stdinURL.isEmpty
+        else {
+            FileHandle.standardError.write(Data("Error: failed to read URL from stdin\n".utf8))
+            return nil
+        }
+        url = stdinURL
     }
 
     guard url.hasPrefix("bear://") else {

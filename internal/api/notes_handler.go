@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -21,6 +22,9 @@ import (
 // Must match the bridge-side limit (maxBridgeAddFileSize) to prevent files from being
 // accepted by the hub but permanently rejected by the bridge.
 const maxAddFileSize = 5 * 1024 * 1024
+
+// errFileTooLarge is returned by writeUploadedFile when actual bytes exceed maxAddFileSize.
+var errFileTooLarge = errors.New("file exceeds 5 MB limit")
 
 func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 	filter := store.NoteFilter{
@@ -566,6 +570,10 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 	dir := filepath.Join(s.attachmentsDir, attachmentID)
 
 	if err := writeUploadedFile(dir, filename, file); err != nil {
+		if errors.Is(err, errFileTooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -598,6 +606,7 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeUploadedFile creates the directory and writes the uploaded file to disk.
+// It enforces the maxAddFileSize limit on actual bytes written (not just the declared header size).
 // On error, it cleans up and returns an error suitable for the HTTP response.
 func writeUploadedFile(dir, filename string, file io.Reader) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
@@ -612,10 +621,21 @@ func writeUploadedFile(dir, filename string, file io.Reader) error {
 		return fmt.Errorf("failed to create file")
 	}
 
-	if _, err := io.Copy(f, file); err != nil {
+	// Limit actual bytes written to maxAddFileSize+1 to detect oversized files
+	// regardless of what the multipart header.Size declared.
+	limited := io.LimitReader(file, maxAddFileSize+1)
+
+	n, err := io.Copy(f, limited)
+	if err != nil {
 		f.Close()         //nolint:errcheck,gosec // closing before cleanup
 		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup
 		return fmt.Errorf("failed to write file")
+	}
+
+	if n > maxAddFileSize {
+		f.Close()         //nolint:errcheck,gosec // closing before cleanup
+		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup
+		return errFileTooLarge
 	}
 
 	if err := f.Close(); err != nil {
