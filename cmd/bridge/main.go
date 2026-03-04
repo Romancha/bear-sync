@@ -102,11 +102,11 @@ func run(logger *slog.Logger) error {
 	hub := hubclient.NewHTTPClient(cfg.hubURL, cfg.hubToken, logger)
 
 	// Initialize xcallback for write queue processing.
-	// If xcall is not available, queue processing will be skipped.
+	// If bear-xcall is not available, queue processing will be skipped.
 	var xcall xcallback.XCallback
 	xc, err := xcallback.New(xcallback.WithLogger(logger))
 	if err != nil {
-		logger.Warn("xcall not available, write queue processing disabled", "error", err)
+		logger.Warn("bear-xcall not available, write queue processing disabled", "error", err)
 	} else {
 		xcall = xc
 	}

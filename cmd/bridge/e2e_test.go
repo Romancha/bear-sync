@@ -532,7 +532,7 @@ func TestE2E_ReadFlow(t *testing.T) {
 }
 
 // TestE2E_WriteFlow tests the full write path:
-// consumer POST/PUT -> write_queue -> bridge lease -> mock xcall ack -> verify.
+// consumer POST/PUT -> write_queue -> bridge lease -> mock bear-xcall ack -> verify.
 func TestE2E_WriteFlow(t *testing.T) {
 	env := setupE2E(t)
 
@@ -609,7 +609,7 @@ func TestE2E_WriteFlow(t *testing.T) {
 			Status:         "applied",
 		}
 		if item.Action == actionCreateE2E {
-			ack.BearID = "new-bear-uuid-from-xcall"
+			ack.BearID = "new-bear-uuid-from-bear-xcall"
 		}
 		ackItems = append(ackItems, ack)
 	}
@@ -621,7 +621,7 @@ func TestE2E_WriteFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, createdNoteAfterAck)
 	require.NotNil(t, createdNoteAfterAck.BearID)
-	assert.Equal(t, "new-bear-uuid-from-xcall", *createdNoteAfterAck.BearID)
+	assert.Equal(t, "new-bear-uuid-from-bear-xcall", *createdNoteAfterAck.BearID)
 	assert.Equal(t, "synced", createdNoteAfterAck.SyncStatus)
 }
 

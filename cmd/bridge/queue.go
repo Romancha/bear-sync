@@ -10,11 +10,11 @@ import (
 	"github.com/romancha/bear-sync/internal/models"
 )
 
-// verifyDelay is how long to wait before verifying xcall results in Bear SQLite.
+// verifyDelay is how long to wait before verifying bear-xcall results in Bear SQLite.
 const verifyDelay = 2 * time.Second
 
 // maxXCallbackBodySize is the practical limit for x-callback-url body size (~50 KB).
-// Notes with body exceeding this limit after URL-encoding will fail the xcall invocation.
+// Notes with body exceeding this limit after URL-encoding will fail the bear-xcall invocation.
 const maxXCallbackBodySize = 50 * 1024
 
 // createFallbackWindow is the time window for finding recently created notes (5 seconds).
@@ -38,7 +38,7 @@ type addTagPayload struct {
 	Tag string `json:"tag"`
 }
 
-// processQueue leases write queue items from the hub and applies them to Bear via xcall.
+// processQueue leases write queue items from the hub and applies them to Bear via bear-xcall.
 func (b *Bridge) processQueue(ctx context.Context) error {
 	if b.xcall == nil {
 		b.logger.Debug("xcallback not configured, skipping queue processing")
@@ -137,7 +137,7 @@ func (b *Bridge) handleConflictItem(ctx context.Context, item *models.WriteQueue
 
 	conflictTitle := "[Conflict] " + title
 
-	// Create a conflict note in Bear via xcall.
+	// Create a conflict note in Bear via bear-xcall.
 	bearID, err := b.xcall.Create(ctx, b.bearToken, conflictTitle, body, nil)
 	if err != nil {
 		ack.Status = "failed"
@@ -183,7 +183,7 @@ func (b *Bridge) extractConflictContent(ctx context.Context, item *models.WriteQ
 	return title, body
 }
 
-// applyCreate creates a new note in Bear via xcall and returns the bear_id.
+// applyCreate creates a new note in Bear via bear-xcall and returns the bear_id.
 func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (string, error) {
 	var payload createPayload
 	if err := json.Unmarshal([]byte(item.Payload), &payload); err != nil {
@@ -196,7 +196,7 @@ func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (
 
 	bearID, err := b.xcall.Create(ctx, b.bearToken, payload.Title, payload.Body, payload.Tags)
 	if err != nil {
-		return "", fmt.Errorf("xcall create: %w", err)
+		return "", fmt.Errorf("bear-xcall create: %w", err)
 	}
 
 	if bearID != "" {
@@ -213,8 +213,8 @@ func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (
 		return bearID, nil
 	}
 
-	// Fallback verification: xcall didn't return a UUID.
-	b.logger.Warn("xcall create returned empty identifier, attempting fallback verification")
+	// Fallback verification: bear-xcall didn't return a UUID.
+	b.logger.Warn("bear-xcall create returned empty identifier, attempting fallback verification")
 
 	// Capture the baseline epoch BEFORE sleeping so the search window covers the time
 	// when the note was actually created, not after the sleep has elapsed.
@@ -236,7 +236,7 @@ func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (
 	}
 }
 
-// applyUpdate updates a note body in Bear via xcall.
+// applyUpdate updates a note body in Bear via bear-xcall.
 func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) error {
 	var payload updatePayload
 	if err := json.Unmarshal([]byte(item.Payload), &payload); err != nil {
@@ -244,7 +244,7 @@ func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) e
 	}
 
 	// Look up bear_id for this note. The item.NoteID is the hub UUID,
-	// but we need the Bear UUID for xcall. Check if note already has the desired content.
+	// but we need the Bear UUID for bear-xcall. Check if note already has the desired content.
 	note, err := b.findBearNoteForItem(ctx, item)
 	if err != nil {
 		return fmt.Errorf("find bear note: %w", err)
@@ -266,7 +266,7 @@ func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) e
 	}
 
 	if err := b.xcall.Update(ctx, b.bearToken, note.UUID, body); err != nil {
-		return fmt.Errorf("xcall update: %w", err)
+		return fmt.Errorf("bear-xcall update: %w", err)
 	}
 
 	// Verify update.
@@ -275,7 +275,7 @@ func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) e
 	updated, err := b.db.NoteByUUID(ctx, note.UUID)
 	if err != nil {
 		b.logger.Warn("update verification query failed", "bear_id", note.UUID, "error", err)
-		return nil // xcall succeeded, verification is best-effort
+		return nil // bear-xcall succeeded, verification is best-effort
 	}
 
 	if updated != nil && updated.Body != body {
@@ -285,7 +285,7 @@ func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) e
 	return nil
 }
 
-// applyAddTag adds a tag to a note in Bear via xcall.
+// applyAddTag adds a tag to a note in Bear via bear-xcall.
 func (b *Bridge) applyAddTag(ctx context.Context, item *models.WriteQueueItem) error {
 	var payload addTagPayload
 	if err := json.Unmarshal([]byte(item.Payload), &payload); err != nil {
@@ -311,7 +311,7 @@ func (b *Bridge) applyAddTag(ctx context.Context, item *models.WriteQueueItem) e
 	}
 
 	if err := b.xcall.AddTag(ctx, b.bearToken, note.UUID, payload.Tag); err != nil {
-		return fmt.Errorf("xcall add-tag: %w", err)
+		return fmt.Errorf("bear-xcall add-tag: %w", err)
 	}
 
 	// Verify tag addition.
@@ -338,7 +338,7 @@ func (b *Bridge) applyAddTag(ctx context.Context, item *models.WriteQueueItem) e
 	return nil
 }
 
-// applyTrash moves a note to trash in Bear via xcall.
+// applyTrash moves a note to trash in Bear via bear-xcall.
 func (b *Bridge) applyTrash(ctx context.Context, item *models.WriteQueueItem) error {
 	note, err := b.findBearNoteForItem(ctx, item)
 	if err != nil {
@@ -352,7 +352,7 @@ func (b *Bridge) applyTrash(ctx context.Context, item *models.WriteQueueItem) er
 	}
 
 	if err := b.xcall.Trash(ctx, b.bearToken, note.UUID); err != nil {
-		return fmt.Errorf("xcall trash: %w", err)
+		return fmt.Errorf("bear-xcall trash: %w", err)
 	}
 
 	// Verify trash.
@@ -365,7 +365,7 @@ func (b *Bridge) applyTrash(ctx context.Context, item *models.WriteQueueItem) er
 	}
 
 	if updated != nil && updated.Trashed != 1 {
-		b.logger.Warn("trash verification: note not trashed after xcall", "bear_id", note.UUID)
+		b.logger.Warn("trash verification: note not trashed after bear-xcall", "bear_id", note.UUID)
 	}
 
 	return nil

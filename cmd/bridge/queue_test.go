@@ -52,12 +52,12 @@ func TestProcessQueue_NilXCallback(t *testing.T) {
 			{ID: 1, Action: "create", Payload: `{"title":"Test"}`},
 		},
 	}
-	bridge := newTestBridge(db, hub, statePath) // nil xcall
+	bridge := newTestBridge(db, hub, statePath) // nil bear-xcall
 
 	err := bridge.processQueue(context.Background())
 	require.NoError(t, err)
 
-	// No ack because xcall is nil — queue processing skipped entirely.
+	// No ack because bear-xcall is nil — queue processing skipped entirely.
 	assert.Empty(t, hub.ackItems)
 }
 
@@ -85,7 +85,7 @@ func TestProcessQueue_CreateAction(t *testing.T) {
 	err := bridge.processQueue(context.Background())
 	require.NoError(t, err)
 
-	// Verify xcall was called.
+	// Verify bear-xcall was called.
 	require.Len(t, xcall.calls, 1)
 	assert.Equal(t, "create", xcall.calls[0].action)
 	assert.Equal(t, "New Note", xcall.calls[0].title)
@@ -210,7 +210,7 @@ func TestProcessQueue_UpdateDuplicateSafe(t *testing.T) {
 	err := bridge.processQueue(context.Background())
 	require.NoError(t, err)
 
-	// xcall should NOT be called — body already matches.
+	// bear-xcall should NOT be called — body already matches.
 	assert.Empty(t, xcall.calls)
 
 	require.Len(t, hub.ackItems, 1)
@@ -279,7 +279,7 @@ func TestProcessQueue_AddTagDuplicateSafe(t *testing.T) {
 	err := bridge.processQueue(context.Background())
 	require.NoError(t, err)
 
-	// xcall should NOT be called — tag already exists.
+	// bear-xcall should NOT be called — tag already exists.
 	assert.Empty(t, xcall.calls)
 
 	require.Len(t, hub.ackItems, 1)
@@ -340,7 +340,7 @@ func TestProcessQueue_TrashDuplicateSafe(t *testing.T) {
 	err := bridge.processQueue(context.Background())
 	require.NoError(t, err)
 
-	// xcall should NOT be called — note already trashed.
+	// bear-xcall should NOT be called — note already trashed.
 	assert.Empty(t, xcall.calls)
 
 	require.Len(t, hub.ackItems, 1)
@@ -422,7 +422,7 @@ func TestProcessQueue_CreateWithXCallError(t *testing.T) {
 			},
 		},
 	}
-	xcall := &mockXCallback{createErr: fmt.Errorf("xcall failed")}
+	xcall := &mockXCallback{createErr: fmt.Errorf("bear-xcall failed")}
 	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
 
 	err := bridge.processQueue(context.Background())
@@ -430,7 +430,7 @@ func TestProcessQueue_CreateWithXCallError(t *testing.T) {
 
 	require.Len(t, hub.ackItems, 1)
 	assert.Equal(t, "failed", hub.ackItems[0].Status)
-	assert.Contains(t, hub.ackItems[0].Error, "xcall failed")
+	assert.Contains(t, hub.ackItems[0].Error, "bear-xcall failed")
 }
 
 func TestProcessQueue_BearIDFromPayload(t *testing.T) {
@@ -490,7 +490,7 @@ func TestProcessQueue_ConflictCreatesConflictNote(t *testing.T) {
 	err := bridge.processQueue(context.Background())
 	require.NoError(t, err)
 
-	// Should have called xcall.Create with conflict title.
+	// Should have called bear-xcall Create with conflict title.
 	require.Len(t, xcall.calls, 1)
 	assert.Equal(t, "create", xcall.calls[0].action)
 	assert.Equal(t, "[Conflict] Original Note", xcall.calls[0].title)
@@ -548,7 +548,7 @@ func TestProcessQueue_ConflictXCallFails(t *testing.T) {
 			},
 		},
 	}
-	xcall := &mockXCallback{createErr: fmt.Errorf("xcall unavailable")}
+	xcall := &mockXCallback{createErr: fmt.Errorf("bear-xcall unavailable")}
 	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
 
 	err := bridge.processQueue(context.Background())

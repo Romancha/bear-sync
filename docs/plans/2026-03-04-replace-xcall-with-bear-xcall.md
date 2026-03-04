@@ -99,9 +99,9 @@
 - [x] run tests: `make test` — must pass before next task
 
 ### Task 5: Update bridge initialization
-- [ ] update `cmd/bridge/main.go` log messages from "xcall" to "bear-xcall"
-- [ ] update any hardcoded "xcall" references in bridge code
-- [ ] run tests: `make test` — must pass before next task
+- [x] update `cmd/bridge/main.go` log messages from "xcall" to "bear-xcall"
+- [x] update any hardcoded "xcall" references in bridge code
+- [x] run tests: `make test` — must pass before next task
 
 ### Task 6: Verify acceptance criteria
 - [ ] verify all requirements from Overview are implemented
