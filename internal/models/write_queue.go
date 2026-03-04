@@ -6,7 +6,7 @@ package models
 type WriteQueueItem struct {
 	ID             int64  `json:"id"`
 	IdempotencyKey string `json:"idempotency_key"`
-	Action         string `json:"action"` // create | update | add_tag | trash
+	Action         string `json:"action"` // create | update | add_tag | trash | add_file | archive | rename_tag | delete_tag
 	NoteID         string `json:"note_id,omitempty"`
 	Payload        string `json:"payload"` // JSON with operation data
 	CreatedAt      string `json:"created_at,omitempty"`

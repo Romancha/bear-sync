@@ -204,7 +204,14 @@ func (s *Server) syncDownloadAttachment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.serveAttachmentFile(w, r, attachment)
+	// If found in DB, serve via the normal path.
+	if attachment != nil {
+		s.serveAttachmentFile(w, r, attachment)
+		return
+	}
+
+	// Fall back to serving consumer-uploaded files (addFile writes to disk without a DB record).
+	s.serveConsumerUploadedFile(w, r, id)
 }
 
 type syncStatusResponse struct {

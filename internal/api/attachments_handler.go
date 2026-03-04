@@ -48,3 +48,22 @@ func (s *Server) serveAttachmentFile(w http.ResponseWriter, r *http.Request, att
 	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitized+`"`)
 	http.ServeFile(w, r, filePath)
 }
+
+// serveConsumerUploadedFile serves a file uploaded by a consumer via the addFile endpoint.
+// Consumer-uploaded files are stored on disk at attachmentsDir/{id}/{filename} without a DB record.
+func (s *Server) serveConsumerUploadedFile(w http.ResponseWriter, r *http.Request, id string) {
+	dir := filepath.Join(s.attachmentsDir, id)
+
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) == 0 {
+		writeError(w, http.StatusNotFound, "attachment not found")
+		return
+	}
+
+	filename := entries[0].Name()
+	filePath := filepath.Join(dir, filename)
+
+	sanitized := strings.NewReplacer(`"`, `_`, "\r", "", "\n", "").Replace(filename)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitized+`"`)
+	http.ServeFile(w, r, filePath) //nolint:gosec // path from internal generated ID
+}

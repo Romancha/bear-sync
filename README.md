@@ -37,7 +37,7 @@ graph TB
     Bridge -- "POST /api/sync/push\n(bridge token)" --> Caddy
     Bridge -- "GET /api/sync/queue\nPOST /api/sync/ack" --> Caddy
     Caddy --> Hub
-    Consumer -- "GET/POST/PUT/DELETE /api/notes/\n(consumer token)" --> Caddy
+    Consumer -- "GET/POST/PUT/DELETE /api/notes/, /api/tags/\n(consumer token)" --> Caddy
 ```
 
 ### Note `sync_status` State Machine
@@ -70,7 +70,7 @@ Consumers can enqueue write operations via the hub API. The bridge picks them up
 | `create` | `POST /api/notes` | Create a new note |
 | `update` | `PUT /api/notes/{id}` | Update note title/body |
 | `add_tag` | `POST /api/notes/{id}/tags` | Add a tag to a note |
-| `trash` | `POST /api/notes/{id}/trash` | Move note to trash |
+| `trash` | `DELETE /api/notes/{id}` | Move note to trash |
 | `add_file` | `POST /api/notes/{id}/attachments` | Attach a file to a note (multipart, 10 MB limit) |
 | `archive` | `POST /api/notes/{id}/archive` | Archive a note |
 | `rename_tag` | `PUT /api/tags/{id}` | Rename a tag |

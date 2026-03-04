@@ -499,6 +499,14 @@ func TestArchiveNote_Success(t *testing.T) {
 	result := readBody(t, resp)
 	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
 	assert.Equal(t, "pending_to_bear", result["sync_status"])
+	assert.Equal(t, float64(1), result["archived"])
+
+	// Verify database was actually updated.
+	updated, err := s.GetNote(t.Context(), "note-arch")
+	require.NoError(t, err)
+	assert.Equal(t, "pending_to_bear", updated.SyncStatus)
+	assert.Equal(t, 1, updated.Archived)
+	assert.NotEmpty(t, updated.ArchivedAt)
 }
 
 func TestArchiveNote_Encrypted403(t *testing.T) {
@@ -1268,6 +1276,7 @@ func TestAddFile_Success(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(items[0].Payload), &payload))
 	assert.NotEmpty(t, payload["attachment_id"])
 	assert.Equal(t, "photo.jpg", payload["filename"])
+	assert.Equal(t, "bear-addfile-1", payload["bear_id"])
 }
 
 func TestAddFile_EncryptedNote_403(t *testing.T) {

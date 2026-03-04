@@ -461,9 +461,14 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC().Format(time.RFC3339)
 
+	// Save original state for rollback if enqueue fails.
+	oldArchived := note.Archived
+	oldArchivedAt := note.ArchivedAt
 	oldSyncStatus := note.SyncStatus
 	oldHubModifiedAt := note.HubModifiedAt
 
+	note.Archived = 1
+	note.ArchivedAt = now
 	note.SyncStatus = syncStatusPendingToBear
 	note.HubModifiedAt = now
 
@@ -478,6 +483,9 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.EnqueueWrite(
 		r.Context(), idempotencyKey, "archive", note.ID, string(payload), consumerID,
 	); err != nil {
+		// Restore original note state to avoid permanently stuck pending_to_bear.
+		note.Archived = oldArchived
+		note.ArchivedAt = oldArchivedAt
 		note.SyncStatus = oldSyncStatus
 		note.HubModifiedAt = oldHubModifiedAt
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
@@ -575,6 +583,7 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(map[string]string{ //nolint:errcheck // cannot fail
 		"attachment_id": attachmentID,
 		"filename":      filename,
+		"bear_id":       *note.BearID,
 	})
 
 	item, err := s.store.EnqueueWrite(
