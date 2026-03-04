@@ -96,8 +96,8 @@
 - [x] run `make test` — must pass before next task
 
 ### Task 7: Create quick start guide
-- [ ] create `docs/consumer-api.md` with: auth header format, base URL, idempotency requirement, curl examples (list notes, get note, create note, search notes, sync status), write flow explanation, error codes table, link to Swagger UI
-- [ ] run `make test` — must pass before next task
+- [x] create `docs/consumer-api.md` with: auth header format, base URL, idempotency requirement, curl examples (list notes, get note, create note, search notes, sync status), write flow explanation, error codes table, link to Swagger UI
+- [x] run `make test` — must pass before next task
 
 ### Task 8: Verify acceptance criteria
 - [ ] verify all 15 consumer handlers have swag annotations
