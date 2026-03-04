@@ -13,7 +13,15 @@ import (
 	"github.com/romancha/bear-sync/internal/xcallback"
 )
 
+// version is set at build time via ldflags.
+var version = "dev"
+
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("bear-bridge " + version)
+		return
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 

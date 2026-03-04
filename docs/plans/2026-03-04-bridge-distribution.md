@@ -36,11 +36,11 @@
 ## Implementation Steps
 
 ### Task 1: Add version injection via ldflags
-- [ ] Add `version` variable in `cmd/bridge/main.go` (set via `-ldflags -X`)
-- [ ] Add `--version` flag to bridge that prints version and exits
-- [ ] Update Makefile `build` target to accept `VERSION` variable and inject via ldflags
-- [ ] Write tests for version flag handling
-- [ ] Run tests — must pass before next task
+- [x] Add `version` variable in `cmd/bridge/main.go` (set via `-ldflags -X`)
+- [x] Add `--version` flag to bridge that prints version and exits
+- [x] Update Makefile `build` target to accept `VERSION` variable and inject via ldflags
+- [x] Write tests for version flag handling
+- [x] Run tests — must pass before next task
 
 ### Task 2: Create GitHub Actions release workflow for bridge
 - [ ] Create `.github/workflows/release-bridge.yml` triggered on `v*` tags

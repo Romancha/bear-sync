@@ -3,6 +3,9 @@
 BINARY_HUB=bear-sync-hub
 BINARY_BRIDGE=bear-bridge
 
+# Version for ldflags injection (default: dev, override with make build VERSION=v1.0.0)
+VERSION ?= dev
+
 # Code signing identity for bear-xcall.app (use "Developer ID Application: ..." for distribution)
 CODESIGN_IDENTITY ?= -
 
@@ -59,7 +62,7 @@ help:
 build: build-xcall
 	@echo "Building $(BINARY_HUB) and $(BINARY_BRIDGE)..."
 	go build -o bin/$(BINARY_HUB) ./cmd/hub
-	go build -o bin/$(BINARY_BRIDGE) ./cmd/bridge
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/$(BINARY_BRIDGE) ./cmd/bridge
 
 build-xcall:
 ifeq ($(shell uname),Darwin)
