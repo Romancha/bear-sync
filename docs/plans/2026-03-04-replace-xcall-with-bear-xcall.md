@@ -47,8 +47,8 @@
 ## Implementation Steps
 
 ### Task 1: Create bear-xcall Swift CLI
-- [ ] create `tools/bear-xcall/` directory
-- [ ] create `tools/bear-xcall/main.swift` with:
+- [x] create `tools/bear-xcall/` directory
+- [x] create `tools/bear-xcall/main.swift` with:
   - argument parsing (`-url`, `-timeout` with default 10s)
   - NSApplication setup for event loop
   - NSAppleEventManager handler for `kInternetEventClass`/`kAEGetURL`
@@ -56,9 +56,9 @@
   - open URL via `NSWorkspace.shared.open()`
   - on callback: parse query params → JSON dict → stdout, exit(0 or 1)
   - on timeout: error JSON → stderr, exit(2)
-- [ ] create `tools/bear-xcall/Info.plist` with `bear-xcall://` URL scheme registration and `CFBundleIdentifier`
-- [ ] verify `swiftc` compiles successfully: `swiftc -o bin/bear-xcall.app/Contents/MacOS/bear-xcall tools/bear-xcall/main.swift`
-- [ ] verify Info.plist copy: `cp tools/bear-xcall/Info.plist bin/bear-xcall.app/Contents/`
+- [x] create `tools/bear-xcall/Info.plist` with `bear-xcall://` URL scheme registration and `CFBundleIdentifier`
+- [x] verify `swiftc` compiles successfully: `swiftc -o bin/bear-xcall.app/Contents/MacOS/bear-xcall tools/bear-xcall/main.swift`
+- [x] verify Info.plist copy: `cp tools/bear-xcall/Info.plist bin/bear-xcall.app/Contents/`
 
 ### Task 2: Create Swift manual tests for bear-xcall CLI
 - [ ] create `tools/bear-xcall/BearXcallTests.swift` with XCTest suite:
