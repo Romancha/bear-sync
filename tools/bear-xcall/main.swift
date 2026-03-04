@@ -136,13 +136,15 @@ class XCallbackHandler: NSObject {
         let isError = url.path == "/error"
 
         // Parse query parameters into a dictionary.
+        // Normalize Bear's hyphenated keys (e.g. "error-Code") to camelCase ("errorCode").
         var result: [String: String] = [:]
         if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
            let queryItems = components.queryItems
         {
             for item in queryItems {
                 if let value = item.value {
-                    result[item.name] = value
+                    let key = normalizeBearKey(item.name)
+                    result[key] = value
                 }
             }
         }
@@ -187,6 +189,15 @@ class XCallbackHandler: NSObject {
 }
 
 // MARK: - Helpers
+
+/// Normalizes Bear's hyphenated query parameter keys to camelCase.
+/// Bear returns keys like "error-Code" instead of "errorCode" in x-error callbacks.
+func normalizeBearKey(_ key: String) -> String {
+    guard key.contains("-") else { return key }
+    let parts = key.split(separator: "-")
+    guard let first = parts.first else { return key }
+    return String(first) + parts.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }.joined()
+}
 
 /// Replaces the token query parameter value with "***" to prevent secret leakage in logs/errors.
 func maskToken(_ rawURL: String) -> String {

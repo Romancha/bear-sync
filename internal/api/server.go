@@ -26,8 +26,10 @@ func ConsumerIDFromContext(ctx context.Context) string {
 	return v
 }
 
-const syncStatusConflict = "conflict"
-const syncStatusPendingToBear = "pending_to_bear"
+const (
+	syncStatusConflict      = "conflict"
+	syncStatusPendingToBear = "pending_to_bear"
+)
 
 // Server holds the HTTP handler and dependencies.
 type Server struct {
@@ -59,26 +61,27 @@ func NewServer(s store.Store, consumerTokens map[string]string, bridgeToken, att
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/notes", func(r chi.Router) {
 			r.Use(srv.authMiddleware("consumer"))
-			r.Use(bodyLimitMiddleware(1 << 20)) // 1 MB
 
-			r.Get("/", srv.listNotes)
-			r.Get("/search", srv.searchNotes)
-			r.Get("/{id}", srv.getNote)
-			r.With(idempotencyRequired).Post("/", srv.createNote)
-			r.With(idempotencyRequired).Put("/{id}", srv.updateNote)
-			r.With(idempotencyRequired).Delete("/{id}", srv.trashNote)
+			defaultLimit := bodyLimitMiddleware(1 << 20) // 1 MB
+
+			r.With(defaultLimit).Get("/", srv.listNotes)
+			r.With(defaultLimit).Get("/search", srv.searchNotes)
+			r.With(defaultLimit).Get("/{id}", srv.getNote)
+			r.With(idempotencyRequired, defaultLimit).Post("/", srv.createNote)
+			r.With(idempotencyRequired, defaultLimit).Put("/{id}", srv.updateNote)
+			r.With(idempotencyRequired, defaultLimit).Delete("/{id}", srv.trashNote)
 
 			r.Route("/{noteID}/tags", func(r chi.Router) {
-				r.With(idempotencyRequired).Post("/", srv.addTag)
+				r.With(idempotencyRequired, defaultLimit).Post("/", srv.addTag)
 			})
 
-			r.With(idempotencyRequired).Post("/{id}/archive", srv.archiveNote)
+			r.With(idempotencyRequired, defaultLimit).Post("/{id}/archive", srv.archiveNote)
 
 			r.Route("/{noteID}/attachments", func(r chi.Router) {
-				r.With(idempotencyRequired, bodyLimitMiddleware(10<<20)).Post("/", srv.addFile)
+				r.With(idempotencyRequired, bodyLimitMiddleware(10<<20)).Post("/", srv.addFile) // 10 MB
 			})
 
-			r.Get("/{noteID}/backlinks", srv.listBacklinks)
+			r.With(defaultLimit).Get("/{noteID}/backlinks", srv.listBacklinks)
 		})
 
 		r.Route("/tags", func(r chi.Router) {
