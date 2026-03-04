@@ -8,6 +8,18 @@ import (
 	"github.com/romancha/bear-sync/internal/models"
 )
 
+// listBacklinks godoc
+// @Summary List backlinks for a note
+// @Description Returns all notes that link to the specified note.
+// @Tags Backlinks
+// @Produce json
+// @Param noteID path string true "Note ID"
+// @Success 200 {array} models.Backlink
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/notes/{noteID}/backlinks [get]
 func (s *Server) listBacklinks(w http.ResponseWriter, r *http.Request) {
 	noteID := chi.URLParam(r, "noteID")
 

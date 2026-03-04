@@ -78,10 +78,10 @@
 - [x] run `make test` — must pass before next task
 
 ### Task 5: Annotate backlinks, attachments, and sync handlers
-- [ ] add swag annotations to `listBacklinks` in `backlinks_handler.go` — path param `{noteID}`, `@Router /api/notes/{noteID}/backlinks [get]`
-- [ ] add swag annotations to `getAttachment` in `attachments_handler.go` — `@Router /api/attachments/{id} [get]`
-- [ ] add swag annotations to `syncStatus` in `sync_handler.go` — `@Router /api/sync/status [get]`
-- [ ] run `make test` — must pass before next task
+- [x] add swag annotations to `listBacklinks` in `backlinks_handler.go` — path param `{noteID}`, `@Router /api/notes/{noteID}/backlinks [get]`
+- [x] add swag annotations to `getAttachment` in `attachments_handler.go` — `@Router /api/attachments/{id} [get]`
+- [x] add swag annotations to `syncStatus` in `sync_handler.go` — `@Router /api/sync/status [get]`
+- [x] run `make test` — must pass before next task
 
 ### Task 6: Mount Swagger UI and update Makefile
 - [ ] add `httpSwagger "github.com/swaggo/http-swagger/v2"` and `_ "github.com/romancha/bear-sync/internal/api/docs"` imports to `server.go`

@@ -259,14 +259,24 @@ func (s *Server) syncDownloadAttachment(w http.ResponseWriter, r *http.Request) 
 }
 
 type syncStatusResponse struct {
-	LastSyncAt          string   `json:"last_sync_at"`
-	LastPushAt          string   `json:"last_push_at"`
-	QueueSize           int      `json:"queue_size"`
-	InitialSyncComplete string   `json:"initial_sync_complete"`
-	ConflictCount       int      `json:"conflict_count"`
+	LastSyncAt          string   `json:"last_sync_at" example:"2025-01-15T10:30:00Z"`
+	LastPushAt          string   `json:"last_push_at" example:"2025-01-15T10:25:00Z"`
+	QueueSize           int      `json:"queue_size" example:"3"`
+	InitialSyncComplete string   `json:"initial_sync_complete" example:"true"`
+	ConflictCount       int      `json:"conflict_count" example:"0"`
 	ConflictNoteIDs     []string `json:"conflict_note_ids,omitempty"`
 }
 
+// syncStatus godoc
+// @Summary Get sync status
+// @Description Returns the current sync status including last sync times, queue size, and conflict info.
+// @Tags Sync
+// @Produce json
+// @Success 200 {object} syncStatusResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/sync/status [get]
 func (s *Server) syncStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

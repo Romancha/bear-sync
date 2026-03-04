@@ -13,6 +13,18 @@ import (
 
 const fallbackFilename = "file"
 
+// getAttachment godoc
+// @Summary Get an attachment
+// @Description Downloads the attachment file by ID. Returns the file with Content-Disposition header.
+// @Tags Attachments
+// @Produce octet-stream
+// @Param id path string true "Attachment ID"
+// @Success 200 {file} binary
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/attachments/{id} [get]
 func (s *Server) getAttachment(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
