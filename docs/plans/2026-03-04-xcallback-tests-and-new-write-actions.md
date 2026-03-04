@@ -103,13 +103,13 @@
 - [x] run tests: `make test` — must pass before next task
 
 ### Task 5: Add `DeleteTag` to XCallback interface
-- [ ] add `DeleteTag(ctx context.Context, token, tagName string) error` to `XCallback` interface
-- [ ] implement `DeleteTag` on `Xcall`: build `bear://x-callback-url/delete-tag?name=<tagName>&show_window=no`
-- [ ] add `TestDeleteTag/success` sub-test: verify URL prefix, params (token, name, show_window)
-- [ ] add `TestDeleteTag/bear error` sub-test (locked tag scenario)
-- [ ] add `TestDeleteTag/exec error` sub-test
-- [ ] add `TestDeleteTag/invalid JSON response` sub-test
-- [ ] run tests: `make test` — must pass before next task
+- [x] add `DeleteTag(ctx context.Context, token, tagName string) error` to `XCallback` interface
+- [x] implement `DeleteTag` on `Xcall`: build `bear://x-callback-url/delete-tag?name=<tagName>&show_window=no`
+- [x] add `TestDeleteTag/success` sub-test: verify URL prefix, params (token, name, show_window)
+- [x] add `TestDeleteTag/bear error` sub-test (locked tag scenario)
+- [x] add `TestDeleteTag/exec error` sub-test
+- [x] add `TestDeleteTag/invalid JSON response` sub-test
+- [x] run tests: `make test` — must pass before next task
 
 ### Task 6: Regenerate mocks after interface changes
 - [ ] run `make generate` to regenerate `internal/xcallback/xcallback_mock.go` with new methods (AddFile, Archive, RenameTag, DeleteTag)

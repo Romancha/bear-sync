@@ -41,6 +41,9 @@ type XCallback interface {
 
 	// RenameTag renames a tag in Bear. All notes with the old tag are updated.
 	RenameTag(ctx context.Context, token, oldName, newName string) error
+
+	// DeleteTag deletes a tag from all notes in Bear.
+	DeleteTag(ctx context.Context, token, tagName string) error
 }
 
 //go:generate moq -out xcallback_mock.go . XCallback
@@ -395,6 +398,35 @@ func (x *Xcall) RenameTag(ctx context.Context, token, oldName, newName string) e
 	}
 
 	x.logger.Info("bear-xcall rename-tag succeeded", "old_name", oldName, "new_name", newName)
+
+	return nil
+}
+
+func (x *Xcall) DeleteTag(ctx context.Context, token, tagName string) error {
+	params := url.Values{}
+	params.Set("token", token)
+	params.Set("name", tagName)
+	params.Set("show_window", "no")
+
+	callURL := "bear://x-callback-url/delete-tag?" + params.Encode()
+
+	x.logger.Debug("executing bear-xcall delete-tag", "url", MaskToken(callURL), "tag_name", tagName)
+
+	output, err := x.executor.Run(ctx, x.xcallPath, "-url", callURL)
+	if err != nil {
+		return fmt.Errorf("bear-xcall delete-tag: %w", err)
+	}
+
+	result, err := parseXcallResult(output)
+	if err != nil {
+		return fmt.Errorf("bear-xcall delete-tag parse response: %w", err)
+	}
+
+	if result.ErrorCode != 0 {
+		return fmt.Errorf("bear-xcall delete-tag bear error: code=%d msg=%s", result.ErrorCode, result.ErrorMsg)
+	}
+
+	x.logger.Info("bear-xcall delete-tag succeeded", "tag_name", tagName)
 
 	return nil
 }

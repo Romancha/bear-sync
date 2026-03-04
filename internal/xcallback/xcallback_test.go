@@ -492,6 +492,62 @@ func TestRenameTag(t *testing.T) {
 	})
 }
 
+func TestDeleteTag(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		resp := xcallResult{}
+		respJSON, _ := json.Marshal(resp)
+		executor := &mockExecutor{output: respJSON}
+		x := newTestXcall(executor)
+
+		err := x.DeleteTag(context.Background(), "test-token", "old/tag")
+
+		require.NoError(t, err)
+		require.Len(t, executor.calls, 1)
+
+		callURL := executor.calls[0].Args[1]
+		assert.True(t, strings.HasPrefix(callURL, "bear://x-callback-url/delete-tag?"))
+
+		parsed, err := url.Parse(callURL)
+		require.NoError(t, err)
+		q := parsed.Query()
+		assert.Equal(t, "test-token", q.Get("token"))
+		assert.Equal(t, "old/tag", q.Get("name"))
+		assert.Equal(t, "no", q.Get("show_window"))
+	})
+
+	t.Run("bear error", func(t *testing.T) {
+		resp := xcallResult{ErrorCode: 1, ErrorMsg: "tag is locked"}
+		respJSON, _ := json.Marshal(resp)
+		executor := &mockExecutor{output: respJSON}
+		x := newTestXcall(executor)
+
+		err := x.DeleteTag(context.Background(), "tok", "sometag")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bear error")
+	})
+
+	t.Run("exec error", func(t *testing.T) {
+		executor := &mockExecutor{err: fmt.Errorf("exit status 1")}
+		x := newTestXcall(executor)
+
+		err := x.DeleteTag(context.Background(), "tok", "sometag")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bear-xcall delete-tag")
+	})
+
+	t.Run("invalid JSON response", func(t *testing.T) {
+		executor := &mockExecutor{output: []byte("not json")}
+		x := newTestXcall(executor)
+
+		err := x.DeleteTag(context.Background(), "tok", "sometag")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid bear-xcall JSON")
+	})
+}
+
 func TestMaskToken(t *testing.T) {
 	tests := []struct {
 		name     string

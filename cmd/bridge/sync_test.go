@@ -158,6 +158,7 @@ type mockXCallback struct {
 	addFileErr   error
 	archiveErr   error
 	renameTagErr error
+	deleteTagErr error
 	calls        []xcallCall
 }
 
@@ -203,6 +204,11 @@ func (m *mockXCallback) Archive(_ context.Context, _, bearID string) error {
 func (m *mockXCallback) RenameTag(_ context.Context, _, _, _ string) error {
 	m.calls = append(m.calls, xcallCall{action: "rename_tag"})
 	return m.renameTagErr
+}
+
+func (m *mockXCallback) DeleteTag(_ context.Context, _, _ string) error {
+	m.calls = append(m.calls, xcallCall{action: "delete_tag"})
+	return m.deleteTagErr
 }
 
 func strPtr(s string) *string     { return &s }
