@@ -35,6 +35,9 @@ type XCallback interface {
 	// AddFile attaches a file to an existing note in Bear.
 	// fileData must not exceed 5 MB (maxAddFileSize).
 	AddFile(ctx context.Context, token, bearID, filename string, fileData []byte) error
+
+	// Archive moves a note to the archive in Bear.
+	Archive(ctx context.Context, token, bearID string) error
 }
 
 //go:generate moq -out xcallback_mock.go . XCallback
@@ -330,6 +333,35 @@ func (x *Xcall) AddFile(ctx context.Context, token, bearID, filename string, fil
 	}
 
 	x.logger.Info("bear-xcall add-file succeeded", "bear_id", bearID, "filename", filename)
+
+	return nil
+}
+
+func (x *Xcall) Archive(ctx context.Context, token, bearID string) error {
+	params := url.Values{}
+	params.Set("token", token)
+	params.Set("id", bearID)
+	params.Set("show_window", "no")
+
+	callURL := "bear://x-callback-url/archive?" + params.Encode()
+
+	x.logger.Debug("executing bear-xcall archive", "url", MaskToken(callURL), "bear_id", bearID)
+
+	output, err := x.executor.Run(ctx, x.xcallPath, "-url", callURL)
+	if err != nil {
+		return fmt.Errorf("bear-xcall archive: %w", err)
+	}
+
+	result, err := parseXcallResult(output)
+	if err != nil {
+		return fmt.Errorf("bear-xcall archive parse response: %w", err)
+	}
+
+	if result.ErrorCode != 0 {
+		return fmt.Errorf("bear-xcall archive bear error: code=%d msg=%s", result.ErrorCode, result.ErrorMsg)
+	}
+
+	x.logger.Info("bear-xcall archive succeeded", "bear_id", bearID)
 
 	return nil
 }

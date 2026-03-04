@@ -84,13 +84,13 @@
 - [x] run tests: `make test` — must pass before next task
 
 ### Task 3: Add `Archive` to XCallback interface
-- [ ] add `Archive(ctx context.Context, token, bearID string) error` to `XCallback` interface
-- [ ] implement `Archive` on `Xcall`: build `bear://x-callback-url/archive?id=<bearID>&show_window=no`, same pattern as `Trash`
-- [ ] add `TestArchive/success` sub-test: verify URL prefix `bear://x-callback-url/archive?`, params (token, id, show_window)
-- [ ] add `TestArchive/bear error` sub-test
-- [ ] add `TestArchive/exec error` sub-test
-- [ ] add `TestArchive/invalid JSON response` sub-test
-- [ ] run tests: `make test` — must pass before next task
+- [x] add `Archive(ctx context.Context, token, bearID string) error` to `XCallback` interface
+- [x] implement `Archive` on `Xcall`: build `bear://x-callback-url/archive?id=<bearID>&show_window=no`, same pattern as `Trash`
+- [x] add `TestArchive/success` sub-test: verify URL prefix `bear://x-callback-url/archive?`, params (token, id, show_window)
+- [x] add `TestArchive/bear error` sub-test
+- [x] add `TestArchive/exec error` sub-test
+- [x] add `TestArchive/invalid JSON response` sub-test
+- [x] run tests: `make test` — must pass before next task
 
 ### Task 4: Add `RenameTag` to XCallback interface
 - [ ] add `RenameTag(ctx context.Context, token, oldName, newName string) error` to `XCallback` interface

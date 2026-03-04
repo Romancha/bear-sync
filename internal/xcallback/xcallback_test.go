@@ -272,60 +272,79 @@ func TestAddTag(t *testing.T) {
 	})
 }
 
-func TestTrash(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		resp := xcallResult{}
-		respJSON, _ := json.Marshal(resp)
-		executor := &mockExecutor{output: respJSON}
-		x := newTestXcall(executor)
+// testNoteAction holds config for testing Trash/Archive (identical signatures).
+type testNoteAction struct {
+	name      string
+	urlPath   string
+	execLabel string
+	callFn    func(x *Xcall, ctx context.Context, token, bearID string) error
+}
 
-		err := x.Trash(context.Background(), "test-token", "BEAR-UUID")
+var noteActions = []testNoteAction{
+	{"Trash", "bear://x-callback-url/trash?", "bear-xcall trash", func(x *Xcall, ctx context.Context, token, bearID string) error {
+		return x.Trash(ctx, token, bearID)
+	}},
+	{"Archive", "bear://x-callback-url/archive?", "bear-xcall archive", func(x *Xcall, ctx context.Context, token, bearID string) error {
+		return x.Archive(ctx, token, bearID)
+	}},
+}
 
-		require.NoError(t, err)
-		require.Len(t, executor.calls, 1)
+func TestNoteActions(t *testing.T) {
+	for _, action := range noteActions {
+		t.Run(action.name+"/success", func(t *testing.T) {
+			resp := xcallResult{}
+			respJSON, _ := json.Marshal(resp)
+			executor := &mockExecutor{output: respJSON}
+			x := newTestXcall(executor)
 
-		callURL := executor.calls[0].Args[1]
-		assert.True(t, strings.HasPrefix(callURL, "bear://x-callback-url/trash?"))
+			err := action.callFn(x, context.Background(), "test-token", "BEAR-UUID")
 
-		parsed, err := url.Parse(callURL)
-		require.NoError(t, err)
-		q := parsed.Query()
-		assert.Equal(t, "test-token", q.Get("token"))
-		assert.Equal(t, "BEAR-UUID", q.Get("id"))
-		assert.Equal(t, "no", q.Get("show_window"))
-	})
+			require.NoError(t, err)
+			require.Len(t, executor.calls, 1)
 
-	t.Run("bear error", func(t *testing.T) {
-		resp := xcallResult{ErrorCode: 2, ErrorMsg: "note not found"}
-		respJSON, _ := json.Marshal(resp)
-		executor := &mockExecutor{output: respJSON}
-		x := newTestXcall(executor)
+			callURL := executor.calls[0].Args[1]
+			assert.True(t, strings.HasPrefix(callURL, action.urlPath))
 
-		err := x.Trash(context.Background(), "tok", "ID")
+			parsed, err := url.Parse(callURL)
+			require.NoError(t, err)
+			q := parsed.Query()
+			assert.Equal(t, "test-token", q.Get("token"))
+			assert.Equal(t, "BEAR-UUID", q.Get("id"))
+			assert.Equal(t, "no", q.Get("show_window"))
+		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "bear error")
-	})
+		t.Run(action.name+"/bear error", func(t *testing.T) {
+			resp := xcallResult{ErrorCode: 2, ErrorMsg: "note not found"}
+			respJSON, _ := json.Marshal(resp)
+			executor := &mockExecutor{output: respJSON}
+			x := newTestXcall(executor)
 
-	t.Run("exec error", func(t *testing.T) {
-		executor := &mockExecutor{err: fmt.Errorf("exit status 1")}
-		x := newTestXcall(executor)
+			err := action.callFn(x, context.Background(), "tok", "ID")
 
-		err := x.Trash(context.Background(), "tok", "ID")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "bear error")
+		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "bear-xcall trash")
-	})
+		t.Run(action.name+"/exec error", func(t *testing.T) {
+			executor := &mockExecutor{err: fmt.Errorf("exit status 1")}
+			x := newTestXcall(executor)
 
-	t.Run("invalid JSON response", func(t *testing.T) {
-		executor := &mockExecutor{output: []byte("not json")}
-		x := newTestXcall(executor)
+			err := action.callFn(x, context.Background(), "tok", "ID")
 
-		err := x.Trash(context.Background(), "tok", "ID")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), action.execLabel)
+		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid bear-xcall JSON")
-	})
+		t.Run(action.name+"/invalid JSON response", func(t *testing.T) {
+			executor := &mockExecutor{output: []byte("not json")}
+			x := newTestXcall(executor)
+
+			err := action.callFn(x, context.Background(), "tok", "ID")
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid bear-xcall JSON")
+		})
+	}
 }
 
 func TestAddFile(t *testing.T) {
