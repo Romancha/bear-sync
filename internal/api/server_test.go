@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1024,6 +1025,179 @@ func TestGetAttachment_ServesFile(t *testing.T) {
 	body, err := io.ReadAll(getResp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, fileContent, string(body))
+}
+
+// --- AddFile tests ---
+
+// doMultipartUpload creates a multipart form request with a file field and sends it using the consumer token.
+func doMultipartUpload(
+	t *testing.T, ts *httptest.Server, path, filename string, fileData []byte, headers map[string]string,
+) *http.Response {
+	t.Helper()
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+
+	if filename != "" || fileData != nil {
+		fw, err := w.CreateFormFile("file", filename)
+		require.NoError(t, err)
+		_, err = fw.Write(fileData)
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, w.Close())
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+path, &buf) //nolint:noctx // test helper
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+consumerToken)
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req) //nolint:noctx,gosec // test helper
+	require.NoError(t, err)
+
+	return resp
+}
+
+func TestAddFile_Success(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-addfile-1"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-af-1", Title: "Note", BearID: &bearID,
+	}))
+
+	resp := doMultipartUpload(t, ts, "/api/notes/note-af-1/attachments",
+		"photo.jpg", []byte("fake image data"),
+		map[string]string{"Idempotency-Key": "idem-af-1"})
+
+	result := readBody(t, resp)
+	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+	assert.Equal(t, "add_file", result["action"])
+	assert.Equal(t, "note-af-1", result["note_id"])
+
+	// Verify queue item was created.
+	items, err := s.LeaseQueueItems(t.Context(), "test", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "add_file", items[0].Action)
+
+	var payload map[string]string
+	require.NoError(t, json.Unmarshal([]byte(items[0].Payload), &payload))
+	assert.NotEmpty(t, payload["attachment_id"])
+	assert.Equal(t, "photo.jpg", payload["filename"])
+}
+
+func TestAddFile_EncryptedNote_403(t *testing.T) {
+	ts, s := setupServer(t)
+
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "enc-af", Title: "Encrypted", Encrypted: 1,
+	}))
+
+	resp := doMultipartUpload(t, ts, "/api/notes/enc-af/attachments",
+		"doc.pdf", []byte("data"),
+		map[string]string{"Idempotency-Key": "idem-af-enc"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+}
+
+func TestAddFile_NoBearID_409(t *testing.T) {
+	ts, s := setupServer(t)
+
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-af-nobear", Title: "Pending", SyncStatus: "pending_to_bear",
+	}))
+
+	resp := doMultipartUpload(t, ts, "/api/notes/note-af-nobear/attachments",
+		"image.png", []byte("data"),
+		map[string]string{"Idempotency-Key": "idem-af-nobear"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+}
+
+func TestAddFile_ConflictState_409(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-af-conflict"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-af-conflict", Title: "Conflicted", BearID: &bearID, SyncStatus: "conflict",
+	}))
+
+	resp := doMultipartUpload(t, ts, "/api/notes/note-af-conflict/attachments",
+		"file.txt", []byte("data"),
+		map[string]string{"Idempotency-Key": "idem-af-conflict"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+}
+
+func TestAddFile_MissingIdempotencyKey_400(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-af-noidem"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-af-noidem", Title: "Note", BearID: &bearID,
+	}))
+
+	resp := doMultipartUpload(t, ts, "/api/notes/note-af-noidem/attachments",
+		"readme.md", []byte("data"), nil)
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestAddFile_MissingFile_400(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-af-nofile"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-af-nofile", Title: "Note", BearID: &bearID,
+	}))
+
+	// Send a request with no file field (empty JSON body instead of multipart).
+	resp := doRequest(t, ts, http.MethodPost, "/api/notes/note-af-nofile/attachments",
+		map[string]string{}, consumerToken,
+		map[string]string{"Idempotency-Key": "idem-af-nofile"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestAddFile_DuplicateIdempotencyKey_200(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-af-dup"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-af-dup", Title: "Note", BearID: &bearID,
+	}))
+
+	headers := map[string]string{"Idempotency-Key": "idem-af-dup"}
+
+	// First request.
+	resp1 := doMultipartUpload(t, ts, "/api/notes/note-af-dup/attachments",
+		"photo.jpg", []byte("data"), headers)
+	result1 := readBody(t, resp1)
+	assert.Equal(t, http.StatusAccepted, resp1.StatusCode)
+
+	// Second request with same idempotency key.
+	resp2 := doMultipartUpload(t, ts, "/api/notes/note-af-dup/attachments",
+		"photo.jpg", []byte("data"), headers)
+	result2 := readBody(t, resp2)
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	// Should return the same queue item.
+	assert.Equal(t, result1["id"], result2["id"])
+
+	// Only one queue item should exist.
+	items, err := s.LeaseQueueItems(t.Context(), "test", 5*time.Minute)
+	require.NoError(t, err)
+	assert.Len(t, items, 1)
 }
 
 // --- Consumer ID propagation tests ---

@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -414,6 +417,105 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, note)
+}
+
+func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
+	noteID := chi.URLParam(r, "noteID")
+
+	note, err := s.store.GetNote(r.Context(), noteID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get note")
+		return
+	}
+
+	if note == nil {
+		writeError(w, http.StatusNotFound, "note not found")
+		return
+	}
+
+	if note.Encrypted == 1 {
+		writeError(w, http.StatusForbidden, "encrypted notes are read-only")
+		return
+	}
+
+	if note.BearID == nil || *note.BearID == "" {
+		writeError(w, http.StatusConflict, "note not yet synced to Bear; retry after initial sync completes")
+		return
+	}
+
+	if note.SyncStatus == syncStatusConflict {
+		writeError(w, http.StatusConflict, "note has unresolved conflicts; resolve conflicts before updating")
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	defer file.Close() //nolint:errcheck // multipart file
+
+	filename := filepath.Base(header.Filename)
+	if filename == "" || filename == "." || filename == "/" {
+		filename = fallbackFilename
+	}
+
+	idempotencyKey := r.Header.Get("Idempotency-Key")
+	consumerID := ConsumerIDFromContext(r.Context())
+
+	if idempotencyKey != "" {
+		existing, err := s.store.GetQueueItemByIdempotencyKey(r.Context(), idempotencyKey, consumerID)
+		if isRetryableQueueItem(existing, err) {
+			writeJSON(w, http.StatusOK, existing)
+			return
+		}
+	}
+
+	attachmentID := generateID()
+
+	dir := filepath.Join(s.attachmentsDir, attachmentID)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create attachment directory")
+		return
+	}
+
+	filePath := filepath.Join(dir, filename)
+
+	f, err := os.Create(filePath) //nolint:gosec // path from internal generated ID + sanitized filename
+	if err != nil {
+		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup
+		writeError(w, http.StatusInternalServerError, "failed to create file")
+		return
+	}
+
+	if _, err := io.Copy(f, file); err != nil {
+		f.Close()         //nolint:errcheck,gosec // closing before cleanup
+		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup
+		writeError(w, http.StatusInternalServerError, "failed to write file")
+		return
+	}
+
+	if err := f.Close(); err != nil {
+		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup
+		writeError(w, http.StatusInternalServerError, "failed to finalize file")
+		return
+	}
+
+	payload, _ := json.Marshal(map[string]string{ //nolint:errcheck // cannot fail
+		"attachment_id": attachmentID,
+		"filename":      filename,
+	})
+
+	item, err := s.store.EnqueueWrite(
+		r.Context(), idempotencyKey, "add_file", note.ID, string(payload), consumerID,
+	)
+	if err != nil {
+		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup on enqueue failure
+		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, item)
 }
 
 // isRetryableQueueItem returns true if an existing queue item for this idempotency key

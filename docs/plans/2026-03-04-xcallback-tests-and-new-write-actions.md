@@ -130,16 +130,16 @@
 - [x] run tests: `make test` — must pass before next task
 
 ### Task 9: Consumer API endpoint — file upload
-- [ ] add `addFile` handler in `internal/api/notes_handler.go`: validate note (exists, has bear_id, not encrypted, not in conflict), parse multipart form, store file to `attachmentsDir/{generatedID}/{filename}`, enqueue `action="add_file"` with payload `{attachment_id, filename}`, return 202
-- [ ] register `POST /notes/{noteID}/attachments` route with `idempotencyRequired` + `bodyLimitMiddleware(10<<20)` in `internal/api/server.go`
-- [ ] add test: success — 202 with queue item
-- [ ] add test: encrypted note → 403
-- [ ] add test: no bear_id → 409
-- [ ] add test: conflict state → 409
-- [ ] add test: missing idempotency key → 400
-- [ ] add test: missing file in form → 400
-- [ ] add test: duplicate idempotency key → 200 returns existing
-- [ ] run tests: `make test` — must pass before next task
+- [x] add `addFile` handler in `internal/api/notes_handler.go`: validate note (exists, has bear_id, not encrypted, not in conflict), parse multipart form, store file to `attachmentsDir/{generatedID}/{filename}`, enqueue `action="add_file"` with payload `{attachment_id, filename}`, return 202
+- [x] register `POST /notes/{noteID}/attachments` route with `idempotencyRequired` + `bodyLimitMiddleware(10<<20)` in `internal/api/server.go`
+- [x] add test: success — 202 with queue item
+- [x] add test: encrypted note → 403
+- [x] add test: no bear_id → 409
+- [x] add test: conflict state → 409
+- [x] add test: missing idempotency key → 400
+- [x] add test: missing file in form → 400
+- [x] add test: duplicate idempotency key → 200 returns existing
+- [x] run tests: `make test` — must pass before next task
 
 ### Task 10: Consumer API endpoint — archive note
 - [ ] add `archiveNote` handler in `internal/api/notes_handler.go` (same pattern as `trashNote`): validate note, set `sync_status="pending_to_bear"`, enqueue `action="archive"` with payload `{bear_id}`, return 202
