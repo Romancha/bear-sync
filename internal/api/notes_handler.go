@@ -16,6 +16,11 @@ import (
 	"github.com/romancha/bear-sync/internal/store"
 )
 
+// maxAddFileSize is the maximum file size for the addFile endpoint (5 MB).
+// Must match the bridge-side limit (maxBridgeAddFileSize) to prevent files from being
+// accepted by the hub but permanently rejected by the bridge.
+const maxAddFileSize = 5 * 1024 * 1024
+
 func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 	filter := store.NoteFilter{
 		Tag:   r.URL.Query().Get("tag"),
@@ -533,6 +538,11 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close() //nolint:errcheck // multipart file
+
+	if header.Size > maxAddFileSize {
+		writeError(w, http.StatusRequestEntityTooLarge, "file exceeds 5 MB limit")
+		return
+	}
 
 	filename := filepath.Base(header.Filename)
 	if filename == "" || filename == "." || filename == "/" {
