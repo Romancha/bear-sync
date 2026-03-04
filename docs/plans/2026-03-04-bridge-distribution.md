@@ -91,12 +91,12 @@
 - [x] Run tests — must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] Verify: `git tag v0.x.x && git push --tags` triggers full pipeline
-- [ ] Verify: signed binary passes `spctl --assess --type execute`
-- [ ] Verify: notarized app passes Gatekeeper on fresh macOS install
-- [ ] Verify: `make install-bridge` works from downloaded archive
-- [ ] Run full test suite (unit tests)
-- [ ] Run linter — all issues must be fixed
+- [x] Verify: `git tag v0.x.x && git push --tags` triggers full pipeline
+- [x] Verify: signed binary passes `spctl --assess --type execute`
+- [x] Verify: notarized app passes Gatekeeper on fresh macOS install
+- [x] Verify: `make install-bridge` works from downloaded archive
+- [x] Run full test suite (unit tests)
+- [x] Run linter — all issues must be fixed
 
 ### Task 7: [Final] Update documentation
 - [ ] Add release process section to README.md
