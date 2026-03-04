@@ -1034,7 +1034,7 @@ func TestProcessQueue_DeleteTagNotFound(t *testing.T) {
 			},
 		},
 	}
-	// Bear returns error for non-existent tag, which bear-xcall surfaces.
+	// Bear returns "not found" error for non-existent tag — bridge should skip (ack as applied).
 	xcall := &mockXCallback{deleteTagErr: fmt.Errorf("bear error: tag not found")}
 	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
 
@@ -1042,8 +1042,7 @@ func TestProcessQueue_DeleteTagNotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, hub.ackItems, 1)
-	assert.Equal(t, "failed", hub.ackItems[0].Status)
-	assert.Contains(t, hub.ackItems[0].Error, "bear-xcall delete-tag")
+	assert.Equal(t, "applied", hub.ackItems[0].Status)
 }
 
 func TestProcessQueue_DeleteTagXCallError(t *testing.T) {

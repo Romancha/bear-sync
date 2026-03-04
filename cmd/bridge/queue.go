@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/romancha/bear-sync/internal/beardb"
@@ -530,6 +531,10 @@ func (b *Bridge) applyDeleteTag(ctx context.Context, item *models.WriteQueueItem
 	}
 
 	if err := b.xcall.DeleteTag(ctx, b.bearToken, payload.Name); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			b.logger.Info("delete_tag skipped: tag not found in Bear", "tag_name", payload.Name)
+			return nil
+		}
 		return fmt.Errorf("bear-xcall delete-tag: %w", err)
 	}
 
