@@ -1105,6 +1105,16 @@ func upsertBacklink(ctx context.Context, tx *sql.Tx, b *models.Backlink) error {
 	b.LinkedByID = resolveNoteID(ctx, tx, b.LinkedByID)
 	b.LinkingToID = resolveNoteID(ctx, tx, b.LinkingToID)
 
+	// Skip backlinks where either side doesn't exist on the hub.
+	// This happens when a note was deleted from Bear (LEFT JOIN → empty string)
+	// or when a note exists in Bear but hasn't been synced to the hub yet.
+	if b.LinkedByID == "" || !noteExistsInTx(ctx, tx, b.LinkedByID) {
+		return nil
+	}
+	if b.LinkingToID == "" || !noteExistsInTx(ctx, tx, b.LinkingToID) {
+		return nil
+	}
+
 	var existingID string
 
 	if b.BearID != nil && *b.BearID != "" {
@@ -1275,6 +1285,12 @@ func insertNoteTagPairs(
 }
 
 // resolveNoteID resolves a Bear UUID or hub UUID to the hub note ID.
+func noteExistsInTx(ctx context.Context, tx *sql.Tx, id string) bool {
+	var exists int
+	err := tx.QueryRowContext(ctx, "SELECT 1 FROM notes WHERE id = ?", id).Scan(&exists)
+	return err == nil
+}
+
 func resolveNoteID(ctx context.Context, tx *sql.Tx, id string) string {
 	if id == "" {
 		return id
