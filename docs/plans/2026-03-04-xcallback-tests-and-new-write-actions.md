@@ -112,8 +112,8 @@
 - [x] run tests: `make test` — must pass before next task
 
 ### Task 6: Regenerate mocks after interface changes
-- [ ] run `make generate` to regenerate `internal/xcallback/xcallback_mock.go` with new methods (AddFile, Archive, RenameTag, DeleteTag)
-- [ ] run tests: `make test` — must pass before next task
+- [x] run `make generate` to regenerate `internal/xcallback/xcallback_mock.go` with new methods (AddFile, Archive, RenameTag, DeleteTag)
+- [x] run tests: `make test` — must pass before next task
 
 ### Task 7: Add `DownloadAttachment` to HubClient
 - [ ] add `DownloadAttachment(ctx context.Context, attachmentID string) ([]byte, error)` to `HubClient` interface in `internal/hubclient/client.go`
