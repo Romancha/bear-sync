@@ -73,15 +73,15 @@
 - [x] run tests: `make test` — must pass before next task
 
 ### Task 2: Add `AddFile` to XCallback interface
-- [ ] add `AddFile(ctx context.Context, token, bearID, filename string, fileData []byte) error` to `XCallback` interface in `internal/xcallback/xcallback.go`
-- [ ] add `maxAddFileSize = 5 * 1024 * 1024` constant
-- [ ] implement `AddFile` on `Xcall`: validate size ≤ 5 MB, base64-encode file data, build `bear://x-callback-url/add-file?` URL with params (id, filename, file, show_window=no, open_note=no), execute and parse response
-- [ ] add `TestAddFile/success` sub-test: verify URL prefix, base64-encoded file param, all query params
-- [ ] add `TestAddFile/bear error` sub-test
-- [ ] add `TestAddFile/exec error` sub-test
-- [ ] add `TestAddFile/invalid JSON response` sub-test
-- [ ] add `TestAddFile/file too large` sub-test: 6 MB data, assert error contains size limit message
-- [ ] run tests: `make test` — must pass before next task
+- [x] add `AddFile(ctx context.Context, token, bearID, filename string, fileData []byte) error` to `XCallback` interface in `internal/xcallback/xcallback.go`
+- [x] add `maxAddFileSize = 5 * 1024 * 1024` constant
+- [x] implement `AddFile` on `Xcall`: validate size ≤ 5 MB, base64-encode file data, build `bear://x-callback-url/add-file?` URL with params (id, filename, file, show_window=no, open_note=no), execute and parse response
+- [x] add `TestAddFile/success` sub-test: verify URL prefix, base64-encoded file param, all query params
+- [x] add `TestAddFile/bear error` sub-test
+- [x] add `TestAddFile/exec error` sub-test
+- [x] add `TestAddFile/invalid JSON response` sub-test
+- [x] add `TestAddFile/file too large` sub-test: 6 MB data, assert error contains size limit message
+- [x] run tests: `make test` — must pass before next task
 
 ### Task 3: Add `Archive` to XCallback interface
 - [ ] add `Archive(ctx context.Context, token, bearID string) error` to `XCallback` interface

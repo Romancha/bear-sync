@@ -2,6 +2,7 @@ package xcallback
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+// maxAddFileSize is the maximum raw file size for AddFile (5 MB).
+// Bear accepts base64-encoded data in the URL, which expands ~33%.
+const maxAddFileSize = 5 * 1024 * 1024
 
 // XCallback defines the interface for executing Bear x-callback-url actions via bear-xcall CLI.
 type XCallback interface {
@@ -26,6 +31,10 @@ type XCallback interface {
 
 	// Trash moves a note to trash in Bear.
 	Trash(ctx context.Context, token, bearID string) error
+
+	// AddFile attaches a file to an existing note in Bear.
+	// fileData must not exceed 5 MB (maxAddFileSize).
+	AddFile(ctx context.Context, token, bearID, filename string, fileData []byte) error
 }
 
 //go:generate moq -out xcallback_mock.go . XCallback
@@ -235,7 +244,7 @@ func (x *Xcall) AddTag(ctx context.Context, token, bearID, tag string) error {
 	params.Set("show_window", "no")
 	params.Set("open_note", "no")
 
-	callURL := "bear://x-callback-url/add-tag?" + params.Encode()
+	callURL := "bear://x-callback-url/add-text?" + params.Encode()
 
 	x.logger.Debug("executing bear-xcall add-tag", "url", MaskToken(callURL), "bear_id", bearID, "tag", tag)
 
@@ -283,6 +292,44 @@ func (x *Xcall) Trash(ctx context.Context, token, bearID string) error {
 	}
 
 	x.logger.Info("bear-xcall trash succeeded", "bear_id", bearID)
+
+	return nil
+}
+
+func (x *Xcall) AddFile(ctx context.Context, token, bearID, filename string, fileData []byte) error {
+	if len(fileData) > maxAddFileSize {
+		return fmt.Errorf("bear-xcall add-file: file size %d exceeds limit %d bytes", len(fileData), maxAddFileSize)
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(fileData)
+
+	params := url.Values{}
+	params.Set("token", token)
+	params.Set("id", bearID)
+	params.Set("filename", filename)
+	params.Set("file", encoded)
+	params.Set("show_window", "no")
+	params.Set("open_note", "no")
+
+	callURL := "bear://x-callback-url/add-file?" + params.Encode()
+
+	x.logger.Debug("executing bear-xcall add-file", "url", MaskToken(callURL), "bear_id", bearID, "filename", filename)
+
+	output, err := x.executor.Run(ctx, x.xcallPath, "-url", callURL)
+	if err != nil {
+		return fmt.Errorf("bear-xcall add-file: %w", err)
+	}
+
+	result, err := parseXcallResult(output)
+	if err != nil {
+		return fmt.Errorf("bear-xcall add-file parse response: %w", err)
+	}
+
+	if result.ErrorCode != 0 {
+		return fmt.Errorf("bear-xcall add-file bear error: code=%d msg=%s", result.ErrorCode, result.ErrorMsg)
+	}
+
+	x.logger.Info("bear-xcall add-file succeeded", "bear_id", bearID, "filename", filename)
 
 	return nil
 }

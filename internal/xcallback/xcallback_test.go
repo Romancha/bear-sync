@@ -2,6 +2,7 @@ package xcallback
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -324,6 +325,78 @@ func TestTrash(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid bear-xcall JSON")
+	})
+}
+
+func TestAddFile(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		resp := xcallResult{}
+		respJSON, _ := json.Marshal(resp)
+		executor := &mockExecutor{output: respJSON}
+		x := newTestXcall(executor)
+
+		fileData := []byte("hello world file content")
+		err := x.AddFile(context.Background(), "test-token", "BEAR-UUID", "photo.jpg", fileData)
+
+		require.NoError(t, err)
+		require.Len(t, executor.calls, 1)
+
+		callURL := executor.calls[0].Args[1]
+		assert.True(t, strings.HasPrefix(callURL, "bear://x-callback-url/add-file?"))
+
+		parsed, err := url.Parse(callURL)
+		require.NoError(t, err)
+		q := parsed.Query()
+		assert.Equal(t, "test-token", q.Get("token"))
+		assert.Equal(t, "BEAR-UUID", q.Get("id"))
+		assert.Equal(t, "photo.jpg", q.Get("filename"))
+		assert.Equal(t, base64.StdEncoding.EncodeToString(fileData), q.Get("file"))
+		assert.Equal(t, "no", q.Get("show_window"))
+		assert.Equal(t, "no", q.Get("open_note"))
+	})
+
+	t.Run("bear error", func(t *testing.T) {
+		resp := xcallResult{ErrorCode: 1, ErrorMsg: "not found"}
+		respJSON, _ := json.Marshal(resp)
+		executor := &mockExecutor{output: respJSON}
+		x := newTestXcall(executor)
+
+		err := x.AddFile(context.Background(), "tok", "ID", "file.txt", []byte("data"))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bear error")
+	})
+
+	t.Run("exec error", func(t *testing.T) {
+		executor := &mockExecutor{err: fmt.Errorf("exit status 1")}
+		x := newTestXcall(executor)
+
+		err := x.AddFile(context.Background(), "tok", "ID", "file.txt", []byte("data"))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bear-xcall add-file")
+	})
+
+	t.Run("invalid JSON response", func(t *testing.T) {
+		executor := &mockExecutor{output: []byte("not json")}
+		x := newTestXcall(executor)
+
+		err := x.AddFile(context.Background(), "tok", "ID", "file.txt", []byte("data"))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid bear-xcall JSON")
+	})
+
+	t.Run("file too large", func(t *testing.T) {
+		executor := &mockExecutor{}
+		x := newTestXcall(executor)
+
+		largeData := make([]byte, 6*1024*1024) // 6 MB
+		err := x.AddFile(context.Background(), "tok", "ID", "big.bin", largeData)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds limit")
+		assert.Empty(t, executor.calls, "executor should not be called for oversized files")
 	})
 }
 

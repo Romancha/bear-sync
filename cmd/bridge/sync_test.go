@@ -155,6 +155,7 @@ type mockXCallback struct {
 	updateErr    error
 	addTagErr    error
 	trashErr     error
+	addFileErr   error
 	calls        []xcallCall
 }
 
@@ -185,6 +186,11 @@ func (m *mockXCallback) AddTag(_ context.Context, _, bearID, tag string) error {
 func (m *mockXCallback) Trash(_ context.Context, _, bearID string) error {
 	m.calls = append(m.calls, xcallCall{action: "trash", bearID: bearID})
 	return m.trashErr
+}
+
+func (m *mockXCallback) AddFile(_ context.Context, _, bearID, _ string, _ []byte) error {
+	m.calls = append(m.calls, xcallCall{action: "add_file", bearID: bearID})
+	return m.addFileErr
 }
 
 func strPtr(s string) *string     { return &s }
