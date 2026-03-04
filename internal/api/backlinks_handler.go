@@ -13,7 +13,7 @@ func (s *Server) listBacklinks(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), noteID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -24,7 +24,7 @@ func (s *Server) listBacklinks(w http.ResponseWriter, r *http.Request) {
 
 	backlinks, err := s.store.ListBacklinksByNote(r.Context(), noteID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list backlinks")
+		writeInternalError(w, "failed to list backlinks", err)
 		return
 	}
 

@@ -66,7 +66,7 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 
 	notes, err := s.store.ListNotes(r.Context(), filter)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list notes")
+		writeInternalError(w, "failed to list notes", err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (s *Server) searchNotes(w http.ResponseWriter, r *http.Request) {
 
 	notes, err := s.store.SearchNotes(r.Context(), q, tag, limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "search failed")
+		writeInternalError(w, "search failed", err)
 		return
 	}
 
@@ -120,7 +120,7 @@ func (s *Server) getNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -193,7 +193,7 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.store.CreateNote(r.Context(), note); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create note")
+		writeInternalError(w, "failed to create note", err)
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *Server) createNote(w http.ResponseWriter, r *http.Request) {
 			slog.Error("failed to delete orphaned note after enqueue failure", //nolint:gosec // G706: note_id is generated UUID, not user input
 				"note_id", note.ID, "enqueue_error", err.Error(), "delete_error", delErr.Error())
 		}
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 
@@ -239,7 +239,7 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -309,7 +309,7 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 	// so that conflict detection in updateExistingNote can compare correctly.
 
 	if err := s.store.UpdateNote(r.Context(), note); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update note")
+		writeInternalError(w, "failed to update note", err)
 		return
 	}
 
@@ -337,7 +337,7 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
 			logNoteRestoreError(note.ID, err, restoreErr)
 		}
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 
@@ -349,7 +349,7 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -400,7 +400,7 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 	note.HubModifiedAt = now
 
 	if err := s.store.UpdateNote(r.Context(), note); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update note")
+		writeInternalError(w, "failed to update note", err)
 		return
 	}
 
@@ -422,7 +422,7 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
 			logNoteRestoreError(note.ID, err, restoreErr)
 		}
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 
@@ -434,7 +434,7 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -483,7 +483,7 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 	note.HubModifiedAt = now
 
 	if err := s.store.UpdateNote(r.Context(), note); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update note")
+		writeInternalError(w, "failed to update note", err)
 		return
 	}
 
@@ -501,7 +501,7 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
 			logNoteRestoreError(note.ID, err, restoreErr)
 		}
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 
@@ -513,7 +513,7 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), noteID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -574,7 +574,7 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusRequestEntityTooLarge, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "failed to write uploaded file", err)
 		return
 	}
 
@@ -589,7 +589,7 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		os.RemoveAll(dir) //nolint:errcheck,gosec // cleanup on enqueue failure
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 

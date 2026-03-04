@@ -6,23 +6,14 @@
 	<string>com.romancha.bear-bridge</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/usr/local/bin/bear-bridge</string>
+		<string>__HOME__/bin/bear-bridge-wrapper.sh</string>
 	</array>
 	<key>StartInterval</key>
 	<integer>300</integer>
-	<key>EnvironmentVariables</key>
-	<dict>
-		<key>BRIDGE_HUB_URL</key>
-		<string>https://bear-sync.example.com</string>
-		<key>BRIDGE_HUB_TOKEN</key>
-		<string>CHANGEME</string>
-		<key>BEAR_TOKEN</key>
-		<string>CHANGEME</string>
-	</dict>
 	<key>StandardOutPath</key>
-	<string>/tmp/bear-bridge.stdout.log</string>
+	<string>__HOME__/Library/Logs/bear-bridge/stdout.log</string>
 	<key>StandardErrorPath</key>
-	<string>/tmp/bear-bridge.stderr.log</string>
+	<string>__HOME__/Library/Logs/bear-bridge/stderr.log</string>
 	<key>RunAtLoad</key>
 	<true/>
 </dict>

@@ -1,7 +1,15 @@
-.PHONY: build build-xcall test test-coverage test-race test-xcall lint fmt tidy clean generate tools help all
+.PHONY: build build-xcall test test-coverage test-race test-xcall lint fmt tidy clean generate tools help all install-bridge uninstall-bridge
 
 BINARY_HUB=bear-sync-hub
 BINARY_BRIDGE=bear-bridge
+
+# Bridge install paths
+PLIST_LABEL=com.romancha.bear-bridge
+PLIST_SRC=deploy/$(PLIST_LABEL).plist
+PLIST_DST=$(HOME)/Library/LaunchAgents/$(PLIST_LABEL).plist
+BRIDGE_BIN_DIR=$(HOME)/bin
+BRIDGE_LOG_DIR=$(HOME)/Library/Logs/bear-bridge
+BRIDGE_CONFIG_DIR=$(HOME)/.config/bear-bridge
 
 # Go tools path
 ifeq (,$(shell go env GOBIN))
@@ -26,6 +34,8 @@ help:
 	@echo "  Build:"
 	@echo "    make build          - Build all binaries to bin/ (includes bear-xcall on macOS)"
 	@echo "    make build-xcall    - Build bear-xcall Swift CLI .app bundle (macOS only)"
+	@echo "    make install-bridge - Install bridge + launchd agent to ~/bin/ (macOS only)"
+	@echo "    make uninstall-bridge - Uninstall bridge + launchd agent (macOS only)"
 	@echo ""
 	@echo "  Test:"
 	@echo "    make test           - Run all Go tests"
@@ -111,3 +121,56 @@ tools:
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
 	go install mvdan.cc/gofumpt@latest
 	go install golang.org/x/tools/cmd/goimports@latest
+
+install-bridge: build
+ifeq ($(shell uname),Darwin)
+	@echo "Installing bear-bridge to $(BRIDGE_BIN_DIR)..."
+	@launchctl bootout gui/$$(id -u)/$(PLIST_LABEL) 2>/dev/null || true
+	@mkdir -p $(BRIDGE_BIN_DIR)
+	@mkdir -p $(BRIDGE_LOG_DIR)
+	@mkdir -p $(BRIDGE_CONFIG_DIR)
+	cp bin/$(BINARY_BRIDGE) $(BRIDGE_BIN_DIR)/
+	cp -R bin/bear-xcall.app $(BRIDGE_BIN_DIR)/
+	cp deploy/bear-bridge-wrapper.sh $(BRIDGE_BIN_DIR)/
+	chmod +x $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
+	@if [ ! -f $(BRIDGE_CONFIG_DIR)/.env.bridge ]; then \
+		cp deploy/.env.bridge.example $(BRIDGE_CONFIG_DIR)/.env.bridge; \
+		echo "Created $(BRIDGE_CONFIG_DIR)/.env.bridge from template"; \
+	else \
+		echo "$(BRIDGE_CONFIG_DIR)/.env.bridge already exists, skipping"; \
+	fi
+	@echo "Installing launchd plist to $(PLIST_DST)..."
+	sed 's|__HOME__|$(HOME)|g' $(PLIST_SRC) > $(PLIST_DST)
+	@echo "Loading launchd agent..."
+	launchctl bootstrap gui/$$(id -u) $(PLIST_DST)
+	@echo ""
+	@echo "Installed. Edit your config:"
+	@echo "  nano $(BRIDGE_CONFIG_DIR)/.env.bridge"
+	@echo ""
+	@echo "Then reload the agent:"
+	@echo "  launchctl bootout gui/$$(id -u)/$(PLIST_LABEL)"
+	@echo "  launchctl bootstrap gui/$$(id -u) $(PLIST_DST)"
+else
+	@echo "install-bridge is macOS only"
+	@exit 1
+endif
+
+uninstall-bridge:
+ifeq ($(shell uname),Darwin)
+	@echo "Unloading launchd agent..."
+	@launchctl bootout gui/$$(id -u)/$(PLIST_LABEL) 2>/dev/null || true
+	@echo "Removing plist..."
+	rm -f $(PLIST_DST)
+	@echo "Removing binaries from $(BRIDGE_BIN_DIR)..."
+	rm -f $(BRIDGE_BIN_DIR)/$(BINARY_BRIDGE)
+	rm -rf $(BRIDGE_BIN_DIR)/bear-xcall.app
+	rm -f $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
+	@echo ""
+	@echo "Uninstalled. The following were NOT removed (manual cleanup if desired):"
+	@echo "  $(BRIDGE_CONFIG_DIR)/.env.bridge"
+	@echo "  $(HOME)/.bear-bridge-state.json"
+	@echo "  $(BRIDGE_LOG_DIR)/"
+else
+	@echo "uninstall-bridge is macOS only"
+	@exit 1
+endif

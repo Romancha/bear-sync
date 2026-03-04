@@ -12,7 +12,7 @@ import (
 func (s *Server) listTags(w http.ResponseWriter, r *http.Request) {
 	tags, err := s.store.ListTags(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list tags")
+		writeInternalError(w, "failed to list tags", err)
 		return
 	}
 
@@ -32,7 +32,7 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.store.GetNote(r.Context(), noteID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get note")
+		writeInternalError(w, "failed to get note", err)
 		return
 	}
 
@@ -90,7 +90,7 @@ func (s *Server) addTag(w http.ResponseWriter, r *http.Request) {
 		r.Context(), idempotencyKey, "add_tag", note.ID, string(payload), consumerID,
 	)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 
@@ -106,7 +106,7 @@ func (s *Server) renameTag(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := s.store.GetTag(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get tag")
+		writeInternalError(w, "failed to get tag", err)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (s *Server) renameTag(w http.ResponseWriter, r *http.Request) {
 
 	item, err := s.store.EnqueueWrite(r.Context(), idempotencyKey, "rename_tag", "", string(payload), consumerID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 
@@ -156,7 +156,7 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := s.store.GetTag(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get tag")
+		writeInternalError(w, "failed to get tag", err)
 		return
 	}
 
@@ -182,7 +182,7 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 
 	item, err := s.store.EnqueueWrite(r.Context(), idempotencyKey, "delete_tag", "", string(payload), consumerID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to enqueue write")
+		writeInternalError(w, "failed to enqueue write", err)
 		return
 	}
 

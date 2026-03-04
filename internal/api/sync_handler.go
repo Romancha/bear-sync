@@ -26,7 +26,7 @@ func (s *Server) syncPush(w http.ResponseWriter, r *http.Request) {
 	cleanupIDs := s.collectAttachmentCleanupIDs(r.Context(), req)
 
 	if err := s.store.ProcessSyncPush(r.Context(), req); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to process sync push")
+		writeInternalError(w, "failed to process sync push", err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (s *Server) syncQueue(w http.ResponseWriter, r *http.Request) {
 
 	items, err := s.store.LeaseQueueItems(r.Context(), processingBy, 5*time.Minute)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to lease queue items")
+		writeInternalError(w, "failed to lease queue items", err)
 		return
 	}
 
@@ -159,7 +159,7 @@ func (s *Server) syncAck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.store.AckQueueItems(r.Context(), req.Items); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to ack queue items")
+		writeInternalError(w, "failed to ack queue items", err)
 		return
 	}
 
@@ -178,7 +178,7 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	attachment, err := s.store.GetAttachment(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get attachment")
+		writeInternalError(w, "failed to get attachment", err)
 		return
 	}
 
@@ -186,7 +186,7 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 	if attachment == nil {
 		attachment, err = s.store.GetAttachmentByBearID(r.Context(), id)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to get attachment")
+			writeInternalError(w, "failed to get attachment", err)
 			return
 		}
 	}
@@ -199,7 +199,7 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 	dir := filepath.Join(s.attachmentsDir, attachment.ID)
 
 	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:gosec // path from DB, not user input
-		writeError(w, http.StatusInternalServerError, "failed to create attachment directory")
+		writeInternalError(w, "failed to create attachment directory", err)
 		return
 	}
 
@@ -212,27 +212,27 @@ func (s *Server) syncUploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	f, err := os.Create(filePath) //nolint:gosec // path is constructed from internal data, not user input
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create file")
+		writeInternalError(w, "failed to create file", err)
 		return
 	}
 
 	if _, err := io.Copy(f, r.Body); err != nil {
 		f.Close()           //nolint:errcheck,gosec // closing before cleanup
 		os.Remove(filePath) //nolint:errcheck,gosec // clean up partial file
-		writeError(w, http.StatusInternalServerError, "failed to write file")
+		writeInternalError(w, "failed to write file", err)
 		return
 	}
 
 	if err := f.Close(); err != nil {
 		os.Remove(filePath) //nolint:errcheck,gosec // clean up on flush failure
-		writeError(w, http.StatusInternalServerError, "failed to finalize file")
+		writeInternalError(w, "failed to finalize file", err)
 		return
 	}
 
 	attachment.FilePath = filePath
 	if updateErr := s.store.UpdateAttachment(r.Context(), attachment); updateErr != nil {
 		os.Remove(filePath) //nolint:errcheck,gosec // best-effort cleanup on DB failure
-		writeError(w, http.StatusInternalServerError, "failed to update attachment path")
+		writeInternalError(w, "failed to update attachment path", updateErr)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (s *Server) syncDownloadAttachment(w http.ResponseWriter, r *http.Request) 
 
 	attachment, err := s.store.GetAttachment(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get attachment")
+		writeInternalError(w, "failed to get attachment", err)
 		return
 	}
 

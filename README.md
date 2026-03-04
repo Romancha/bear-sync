@@ -91,7 +91,7 @@ All mutating consumer endpoints require an `Idempotency-Key` header. Encrypted n
 make build
 ```
 
-Binaries are placed in `bin/bear-sync-hub` and `bin/bear-bridge`.
+Binaries are placed in `bin/bear-sync-hub`, `bin/bear-bridge`, and `bin/bear-xcall.app` (macOS only).
 
 ## Hub Setup
 
@@ -167,6 +167,17 @@ docker compose up -d
 
 Data is persisted in Docker named volumes (`hub-data` for SQLite + attachments).
 
+#### Volume Permissions (Synology / bind mounts)
+
+The hub container runs as non-root user `hub` (UID 1000). When using bind mounts, ensure the host directory is owned by UID 1000, otherwise SQLite will fail with `unable to open database file: out of memory (14)`:
+
+```
+mkdir -p /volume1/docker/bear_hub/attachments
+chown -R 1000:1000 /volume1/docker/bear_hub
+```
+
+This is not needed for Docker named volumes — they inherit permissions from the image automatically.
+
 ## Bridge Setup
 
 ### Environment Variables
@@ -175,7 +186,7 @@ Data is persisted in Docker named volumes (`hub-data` for SQLite + attachments).
 |---|---|---|---|
 | `BRIDGE_HUB_URL` | Yes | — | Hub API URL (e.g. `https://bear-sync.example.com`) |
 | `BRIDGE_HUB_TOKEN` | Yes | — | Bearer token matching `HUB_BRIDGE_TOKEN` |
-| `BEAR_TOKEN` | Yes | — | Bear app API token (from Bear preferences) |
+| `BEAR_TOKEN` | Yes | — | Token for Bear x-callback-url API (any string, e.g. `openssl rand -base64 32`; Bear will prompt to allow access on first use) |
 | `BRIDGE_STATE_PATH` | No | `~/.bear-bridge-state.json` | Path to bridge state file |
 | `BEAR_DB_DIR` | No | `~/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data` | Path to Bear Application Data directory |
 
@@ -192,33 +203,44 @@ The bridge runs once per invocation (no daemon mode). Use launchd to schedule pe
 
 ### Launchd (production)
 
-1. Build and install the binaries:
+Install the bridge, bear-xcall, and the launchd agent:
 
 ```
-make build
-sudo cp bin/bear-bridge /usr/local/bin/
-sudo cp -R bin/bear-xcall.app /usr/local/bin/
+make install-bridge
 ```
 
-2. Install the launchd plist:
+This builds both binaries, copies them to `~/bin/`, installs the wrapper script and launchd plist,
+and creates a config template at `~/.config/bear-bridge/.env.bridge`.
+
+Edit the config to set your hub URL and tokens:
 
 ```
-cp deploy/com.romancha.bear-bridge.plist ~/Library/LaunchAgents/
+nano ~/.config/bear-bridge/.env.bridge
 ```
 
-3. Edit the plist to set your tokens and hub URL:
+Reload the agent to pick up the new config:
 
 ```
-nano ~/Library/LaunchAgents/com.romancha.bear-bridge.plist
+launchctl bootout gui/$(id -u)/com.romancha.bear-bridge
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.romancha.bear-bridge.plist
 ```
 
-4. Load the agent:
+The bridge runs every 5 minutes and starts automatically on login.
+
+Logs are written to `~/Library/Logs/bear-bridge/` (`stdout.log`, `stderr.log`). The wrapper script automatically rotates logs when they exceed 5 MB, keeping one backup (`.log.1`).
+
+To update to a new version:
 
 ```
-launchctl load ~/Library/LaunchAgents/com.romancha.bear-bridge.plist
+git pull
+make install-bridge
 ```
 
-The bridge runs every 5 minutes. bear-xcall.app must be in the same directory as the bear-bridge binary.
+To uninstall:
+
+```
+make uninstall-bridge
+```
 
 ## Reverse Proxy
 

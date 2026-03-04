@@ -3,11 +3,12 @@ services:
     build: .
     image: ghcr.io/romancha/bear-sync-hub:latest
     restart: unless-stopped
-    env_file: .env
     environment:
       HUB_HOST: "0.0.0.0"
       HUB_DB_PATH: /data/hub.db
       HUB_ATTACHMENTS_DIR: /data/attachments
+      HUB_CONSUMER_TOKENS: ocw:asd1
+      HUB_BRIDGE_TOKEN: asd2
     volumes:
       - hub-data:/data
     expose:

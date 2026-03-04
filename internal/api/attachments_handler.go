@@ -18,7 +18,7 @@ func (s *Server) getAttachment(w http.ResponseWriter, r *http.Request) {
 
 	attachment, err := s.store.GetAttachment(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get attachment")
+		writeInternalError(w, "failed to get attachment", err)
 		return
 	}
 

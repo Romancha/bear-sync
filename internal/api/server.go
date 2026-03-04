@@ -236,6 +236,11 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
 
+func writeInternalError(w http.ResponseWriter, msg string, err error) {
+	slog.Error(msg, "error", err)
+	writeError(w, http.StatusInternalServerError, msg)
+}
+
 func readJSON(r *http.Request, v any) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		return fmt.Errorf("decode json: %w", err)
