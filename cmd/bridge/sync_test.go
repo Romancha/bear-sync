@@ -336,6 +336,130 @@ func TestInitialSync_BatchedNotes(t *testing.T) {
 	assert.Len(t, state.KnownNoteIDs, 120)
 }
 
+func TestDeltaSync_SkippedWhenDBUnchanged(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+	bearDataDir := filepath.Join(tmpDir, "bear-data")
+	require.NoError(t, os.MkdirAll(bearDataDir, 0o750))
+
+	// Create a fake Bear database file.
+	dbPath := filepath.Join(bearDataDir, "database.sqlite")
+	require.NoError(t, os.WriteFile(dbPath, []byte("fake-db"), 0o600))
+
+	info, err := os.Stat(dbPath)
+	require.NoError(t, err)
+	modTimeNano := info.ModTime().UnixNano()
+
+	// Pre-create state with matching mtime — delta sync should be skipped.
+	state := &BridgeState{
+		LastSyncAt:        100,
+		LastDBModTimeNano: modTimeNano,
+		KnownNoteIDs:      []string{"note-1"},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	db := &mockBearDB{noteUUIDs: []string{"note-1"}}
+	hub := &mockHubClient{}
+	b := NewBridge(db, hub, nil, "", statePath, bearDataDir, testLogger())
+	b.sleepFn = func(_ time.Duration) {}
+
+	err = b.Run(context.Background())
+	require.NoError(t, err)
+
+	// Delta sync skipped — no pushes.
+	assert.Empty(t, hub.pushes)
+
+	// State mtime should remain unchanged.
+	loaded, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, modTimeNano, loaded.LastDBModTimeNano)
+}
+
+func TestDeltaSync_RunsWhenDBChanged(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+	bearDataDir := filepath.Join(tmpDir, "bear-data")
+	require.NoError(t, os.MkdirAll(bearDataDir, 0o750))
+
+	// Create a fake Bear database file.
+	dbPath := filepath.Join(bearDataDir, "database.sqlite")
+	require.NoError(t, os.WriteFile(dbPath, []byte("fake-db"), 0o600))
+
+	info, err := os.Stat(dbPath)
+	require.NoError(t, err)
+	currentModTime := info.ModTime().UnixNano()
+
+	// Pre-create state with a DIFFERENT (older) mtime — delta sync should run.
+	state := &BridgeState{
+		LastSyncAt:        100,
+		LastDBModTimeNano: currentModTime - 1_000_000_000, // 1 second older
+		KnownNoteIDs:      []string{"note-1"},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	db := &mockBearDB{
+		noteUUIDs: []string{"note-1"},
+		tagUUIDs:  []string{},
+	}
+	hub := &mockHubClient{}
+	b := NewBridge(db, hub, nil, "", statePath, bearDataDir, testLogger())
+	b.sleepFn = func(_ time.Duration) {}
+
+	err = b.Run(context.Background())
+	require.NoError(t, err)
+
+	// Delta sync should have run (even though no changes detected, state is saved).
+	loaded, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, currentModTime, loaded.LastDBModTimeNano)
+}
+
+func TestDeltaSync_RunsWhenWALChanged(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+	bearDataDir := filepath.Join(tmpDir, "bear-data")
+	require.NoError(t, os.MkdirAll(bearDataDir, 0o750))
+
+	// Create DB file and a WAL file with a newer mtime.
+	dbPath := filepath.Join(bearDataDir, "database.sqlite")
+	require.NoError(t, os.WriteFile(dbPath, []byte("fake-db"), 0o600))
+
+	dbInfo, err := os.Stat(dbPath)
+	require.NoError(t, err)
+	dbModTime := dbInfo.ModTime().UnixNano()
+
+	// Create WAL file with forced newer mtime.
+	walPath := dbPath + "-wal"
+	require.NoError(t, os.WriteFile(walPath, []byte("fake-wal"), 0o600))
+	futureTime := time.Now().Add(10 * time.Second)
+	require.NoError(t, os.Chtimes(walPath, futureTime, futureTime))
+
+	walInfo, err := os.Stat(walPath)
+	require.NoError(t, err)
+	walModTime := walInfo.ModTime().UnixNano()
+
+	// State has the DB mtime but WAL is newer.
+	state := &BridgeState{
+		LastSyncAt:        100,
+		LastDBModTimeNano: dbModTime,
+		KnownNoteIDs:      []string{"note-1"},
+	}
+	require.NoError(t, saveState(statePath, state))
+
+	db := &mockBearDB{noteUUIDs: []string{"note-1"}}
+	hub := &mockHubClient{}
+	b := NewBridge(db, hub, nil, "", statePath, bearDataDir, testLogger())
+	b.sleepFn = func(_ time.Duration) {}
+
+	err = b.Run(context.Background())
+	require.NoError(t, err)
+
+	// Sync should have run because WAL mtime is newer.
+	loaded, err := loadState(statePath)
+	require.NoError(t, err)
+	assert.Equal(t, walModTime, loaded.LastDBModTimeNano)
+}
+
 func TestDeltaSync_NoChanges(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "state.json")

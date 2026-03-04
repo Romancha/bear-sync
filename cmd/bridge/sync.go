@@ -67,8 +67,14 @@ func (b *Bridge) Run(ctx context.Context) error {
 			return err
 		}
 	} else {
-		if err := b.deltaSync(ctx, state); err != nil {
-			return err
+		modTime := b.bearDBModTime()
+		if modTime != 0 && modTime == state.LastDBModTimeNano {
+			b.logger.Info("bear db unchanged, skipping delta sync")
+		} else {
+			state.LastDBModTimeNano = modTime
+			if err := b.deltaSync(ctx, state); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -78,6 +84,29 @@ func (b *Bridge) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// bearDBModTime returns the latest modification time (UnixNano) of the Bear SQLite
+// database file and its WAL file. Returns 0 if stat fails.
+func (b *Bridge) bearDBModTime() int64 {
+	dbPath := filepath.Join(b.bearDataDir, "database.sqlite")
+	walPath := dbPath + "-wal"
+
+	var maxNano int64
+
+	if info, err := os.Stat(dbPath); err == nil {
+		if t := info.ModTime().UnixNano(); t > maxNano {
+			maxNano = t
+		}
+	}
+
+	if info, err := os.Stat(walPath); err == nil {
+		if t := info.ModTime().UnixNano(); t > maxNano {
+			maxNano = t
+		}
+	}
+
+	return maxNano
 }
 
 // initialSyncData holds all data read from Bear during initial sync.
@@ -164,6 +193,7 @@ func (b *Bridge) initialSync(ctx context.Context) error {
 	// Build and save initial state.
 	state := &BridgeState{
 		LastSyncAt:              currentCoreDataEpoch(),
+		LastDBModTimeNano:       b.bearDBModTime(),
 		KnownNoteIDs:            extractNoteUUIDs(d.noteRows),
 		KnownTagIDs:             extractTagUUIDs(d.tagRows),
 		KnownAttachmentIDs:      extractAttachmentUUIDs(d.attachmentRows),

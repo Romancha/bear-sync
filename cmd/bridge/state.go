@@ -9,6 +9,7 @@ import (
 // BridgeState holds the persistent state of the bridge between sync cycles.
 type BridgeState struct {
 	LastSyncAt              float64  `json:"last_sync_at"` // Core Data epoch
+	LastDBModTimeNano       int64    `json:"last_db_mod_time_nano,omitempty"`
 	KnownNoteIDs            []string `json:"known_note_ids"`
 	KnownTagIDs             []string `json:"known_tag_ids"`
 	KnownAttachmentIDs      []string `json:"known_attachment_ids"`
