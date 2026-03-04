@@ -321,9 +321,15 @@ func runBearTests() {
         }
         let fileContent = "Hello from bear-xcall test"
         let base64Data = Data(fileContent.utf8).base64EncodedString()
+        // urlQueryAllowed includes +, =, & which have special meaning in query values.
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "+&=")
+        guard let encodedBase64 = base64Data.addingPercentEncoding(withAllowedCharacters: allowed) else {
+            return .failed("failed to percent-encode base64 data")
+        }
         let r = try runBearXcallApp([
             "-url",
-            "bear://x-callback-url/add-file?id=\(noteID)&filename=test-attachment.txt&file=\(base64Data)&show_window=no&open_note=no",
+            "bear://x-callback-url/add-file?id=\(noteID)&filename=test-attachment.txt&file=\(encodedBase64)&show_window=no&open_note=no",
             "-timeout", "10",
         ])
         guard r.exitCode == 0 else {
@@ -348,8 +354,6 @@ func runBearTests() {
     }
 
     // Archive test: create a separate note, then archive it.
-    var archiveNoteID: String?
-
     runTest("archive note") {
         // Create a note specifically for archiving.
         let createResult = try runBearXcallApp([
@@ -363,7 +367,6 @@ func runBearTests() {
         else {
             return .failed("failed to create note for archive test: exit \(createResult.exitCode), stderr: \(createResult.stderr)")
         }
-        archiveNoteID = id
 
         let r = try runBearXcallApp([
             "-url",
@@ -399,16 +402,17 @@ func runBearTests() {
     }
 
     runTest("delete tag") {
-        // Create a disposable tag on the archived note, then delete it.
-        if let id = archiveNoteID {
-            let addTag = try runBearXcallApp([
-                "-url",
-                "bear://x-callback-url/add-text?id=\(id)&tags=bear-xcall-test-delete&show_window=no",
-                "-timeout", "10",
-            ])
-            guard addTag.exitCode == 0 else {
-                return .failed("failed to add disposable tag: exit \(addTag.exitCode)")
-            }
+        // Create a fresh note with a disposable tag, then delete the tag.
+        let createResult = try runBearXcallApp([
+            "-url",
+            "bear://x-callback-url/create?title=BearXcallDeleteTagTest&text=Delete%20tag%20test&tags=bear-xcall-test,bear-xcall-test-delete&show_window=no",
+            "-timeout", "10",
+        ])
+        guard createResult.exitCode == 0,
+              let json = parseJSON(createResult.stdout),
+              let id = json["identifier"] as? String, !id.isEmpty
+        else {
+            return .failed("failed to create note for delete-tag test: exit \(createResult.exitCode)")
         }
 
         let r = try runBearXcallApp([
@@ -416,6 +420,14 @@ func runBearTests() {
             "bear://x-callback-url/delete-tag?name=bear-xcall-test-delete&show_window=no",
             "-timeout", "10",
         ])
+
+        // Cleanup: trash the helper note.
+        _ = try? runBearXcallApp([
+            "-url",
+            "bear://x-callback-url/trash?id=\(id)&show_window=no",
+            "-timeout", "10",
+        ])
+
         guard r.exitCode == 0 else {
             return .failed("exit code \(r.exitCode), stderr: \(r.stderr)")
         }
