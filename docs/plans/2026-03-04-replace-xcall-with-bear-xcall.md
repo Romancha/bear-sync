@@ -84,12 +84,12 @@
 - [x] document in Makefile `help` target: `test-xcall — run bear-xcall manual tests (macOS + Bear)`
 
 ### Task 3: Update Makefile build
-- [ ] add `build-xcall` target that creates `.app` bundle structure, compiles Swift, copies Info.plist
-- [ ] add `uname` guard to skip on Linux
-- [ ] add `build-xcall` as dependency of `build` target
-- [ ] add `tools` and `help` sections to reflect bear-xcall
-- [ ] verify `make build` works on macOS
-- [ ] verify `make clean` removes `bin/bear-xcall.app/`
+- [x] add `build-xcall` target that creates `.app` bundle structure, compiles Swift, copies Info.plist
+- [x] add `uname` guard to skip on Linux
+- [x] add `build-xcall` as dependency of `build` target
+- [x] add `tools` and `help` sections to reflect bear-xcall
+- [x] verify `make build` works on macOS
+- [x] verify `make clean` removes `bin/bear-xcall.app/`
 
 ### Task 4: Update Go xcallback to use bear-xcall
 - [ ] update `xcallback.New()` in `internal/xcallback/xcallback.go`: change `LookPath("xcall")` to resolve `bear-xcall.app` bundle path

@@ -1,4 +1,4 @@
-.PHONY: build test test-coverage test-race test-xcall lint fmt tidy clean generate tools help all
+.PHONY: build build-xcall test test-coverage test-race test-xcall lint fmt tidy clean generate tools help all
 
 BINARY_HUB=bear-sync-hub
 BINARY_BRIDGE=bear-bridge
@@ -22,22 +22,39 @@ all: test build
 # Help
 help:
 	@echo "Usage:"
-	@echo "  make build          - Build both binaries to bin/"
-	@echo "  make test           - Run all tests"
-	@echo "  make test-coverage  - Run tests with coverage report"
-	@echo "  make test-race      - Run tests with race detector"
-	@echo "  make lint           - Run golangci-lint"
-	@echo "  make fmt            - Format code (gofumpt + goimports)"
-	@echo "  make tidy           - go mod tidy"
-	@echo "  make clean          - Clean build artifacts"
-	@echo "  make generate       - Run go generate (moq)"
-	@echo "  make test-xcall     - Run bear-xcall manual tests (macOS + Bear)"
-	@echo "  make tools          - Install dev tools"
+	@echo ""
+	@echo "  Build:"
+	@echo "    make build          - Build all binaries to bin/ (includes bear-xcall on macOS)"
+	@echo "    make build-xcall    - Build bear-xcall Swift CLI .app bundle (macOS only)"
+	@echo ""
+	@echo "  Test:"
+	@echo "    make test           - Run all Go tests"
+	@echo "    make test-coverage  - Run tests with coverage report"
+	@echo "    make test-race      - Run tests with race detector"
+	@echo "    make test-xcall     - Run bear-xcall manual tests (macOS + Bear)"
+	@echo ""
+	@echo "  Tools:"
+	@echo "    make lint           - Run golangci-lint"
+	@echo "    make fmt            - Format code (gofumpt + goimports)"
+	@echo "    make tidy           - go mod tidy"
+	@echo "    make clean          - Clean build artifacts"
+	@echo "    make generate       - Run go generate (moq)"
+	@echo "    make tools          - Install dev tools"
 
-build:
+build: build-xcall
 	@echo "Building $(BINARY_HUB) and $(BINARY_BRIDGE)..."
 	go build -o bin/$(BINARY_HUB) ./cmd/hub
 	go build -o bin/$(BINARY_BRIDGE) ./cmd/bridge
+
+build-xcall:
+ifeq ($(shell uname),Darwin)
+	@echo "Building bear-xcall .app bundle..."
+	@mkdir -p bin/bear-xcall.app/Contents/MacOS
+	swiftc -o bin/bear-xcall.app/Contents/MacOS/bear-xcall tools/bear-xcall/main.swift
+	cp tools/bear-xcall/Info.plist bin/bear-xcall.app/Contents/
+else
+	@echo "Skipping bear-xcall build (macOS only)"
+endif
 
 test:
 	@echo "Running tests..."
@@ -80,6 +97,7 @@ clean:
 	@echo "Cleaning..."
 	rm -rf bin/ coverage.out coverage.html
 	go clean
+	@echo "Cleaned bin/, coverage files"
 
 generate:
 	@echo "Generating mocks..."
