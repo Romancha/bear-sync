@@ -98,11 +98,14 @@ class XCallbackHandler: NSObject {
             + "&x-error=bear-xcall://x-callback-url/error"
 
         guard let url = URL(string: callbackURL) else {
-            writeError("Invalid URL: \(bearURL)")
+            writeError("Invalid URL: \(maskToken(bearURL))")
             exit(1)
         }
 
-        NSWorkspace.shared.open(url)
+        if !NSWorkspace.shared.open(url) {
+            writeError("Failed to open URL (is Bear installed?): \(maskToken(bearURL))")
+            exit(1)
+        }
 
         // Start timeout timer. Write timeout error to stdout (same format as Bear error responses)
         // so the Go caller can parse the structured error via parseXcallResult.
@@ -181,6 +184,22 @@ class XCallbackHandler: NSObject {
             FileHandle.standardError.write(Data((str + "\n").utf8))
         }
     }
+}
+
+// MARK: - Helpers
+
+/// Replaces the token query parameter value with "***" to prevent secret leakage in logs/errors.
+func maskToken(_ rawURL: String) -> String {
+    guard var components = URLComponents(string: rawURL) else {
+        return rawURL
+    }
+    components.queryItems = components.queryItems?.map { item in
+        if item.name == "token" {
+            return URLQueryItem(name: "token", value: "***")
+        }
+        return item
+    }
+    return components.string ?? rawURL
 }
 
 // MARK: - Main

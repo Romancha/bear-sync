@@ -393,6 +393,27 @@ func TestNewWithPathAppBundle(t *testing.T) {
 	})
 }
 
+func TestMaskTokenInText(t *testing.T) {
+	t.Run("masks token in stderr message with bear URL", func(t *testing.T) {
+		text := `Failed to open URL (is Bear installed?): bear://x-callback-url/create?token=secret123&title=Hello`
+		result := maskTokenInText(text)
+		assert.NotContains(t, result, "secret123")
+		assert.Contains(t, result, "bear://x-callback-url/create")
+	})
+
+	t.Run("no bear URL unchanged", func(t *testing.T) {
+		text := "some random error message"
+		result := maskTokenInText(text)
+		assert.Equal(t, text, result)
+	})
+
+	t.Run("bear URL without token unchanged", func(t *testing.T) {
+		text := "Failed: bear://x-callback-url/create?title=Hello"
+		result := maskTokenInText(text)
+		assert.Equal(t, text, result)
+	})
+}
+
 func TestMaskTokenNotInLogs(t *testing.T) {
 	rawURL := "bear://x-callback-url/create?token=my-secret-token-123&title=Test"
 	masked := MaskToken(rawURL)

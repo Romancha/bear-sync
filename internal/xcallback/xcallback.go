@@ -53,8 +53,16 @@ func (e *defaultExecutor) Run(ctx context.Context, name string, args ...string) 
 		// bear-xcall writes structured error JSON to stdout even on non-zero exit.
 		// Return stdout if available so the caller can parse Bear error details.
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && len(out) > 0 {
-			return out, nil
+		if errors.As(err, &exitErr) {
+			if len(out) > 0 {
+				return out, nil
+			}
+			// stdout empty — include stderr detail (e.g. "Failed to open URL") in the error.
+			// Mask any token values in stderr to prevent secret leakage in logs/hub storage.
+			if len(exitErr.Stderr) > 0 {
+				stderrMsg := maskTokenInText(strings.TrimSpace(string(exitErr.Stderr)))
+				return nil, fmt.Errorf("exec %s: %w: %s", name, err, stderrMsg)
+			}
 		}
 		return nil, fmt.Errorf("exec %s: %w", name, err)
 	}
@@ -86,7 +94,7 @@ func WithLogger(l *slog.Logger) Option {
 }
 
 // New creates a new Xcall instance. It resolves the bear-xcall.app bundle path
-// by looking next to the running executable, then falling back to PATH.
+// by looking next to the running executable.
 func New(opts ...Option) (*Xcall, error) {
 	x := &Xcall{
 		executor: &defaultExecutor{},
@@ -293,6 +301,28 @@ func MaskToken(rawURL string) string {
 	parsed.RawQuery = q.Encode()
 
 	return parsed.String()
+}
+
+// maskTokenInText finds a bear:// URL in text and masks the token parameter.
+// This prevents secret leakage when stderr content is included in error messages
+// that may be logged or sent to the hub.
+func maskTokenInText(text string) string {
+	const bearPrefix = "bear://"
+	idx := strings.Index(text, bearPrefix)
+	if idx < 0 {
+		return text
+	}
+	// Find the end of the URL (space, newline, or end of string).
+	end := len(text)
+	for i := idx; i < len(text); i++ {
+		if text[i] == ' ' || text[i] == '\n' || text[i] == '\t' {
+			end = i
+			break
+		}
+	}
+	rawURL := text[idx:end]
+	masked := MaskToken(rawURL)
+	return text[:idx] + masked + text[end:]
 }
 
 func parseXcallResult(output []byte) (*xcallResult, error) {
