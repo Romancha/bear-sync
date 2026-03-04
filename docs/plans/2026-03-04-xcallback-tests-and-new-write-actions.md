@@ -200,12 +200,12 @@
 - [x] run tests: `BEAR_XCALL_BEAR_TESTS=1 make test-xcall` — must pass before next task
 
 ### Task 14: Verify acceptance criteria
-- [ ] verify all 4 new actions implemented end-to-end (consumer API → hub queue → bridge apply → Bear)
-- [ ] verify xcallback test coverage gaps are filled
-- [ ] run full test suite: `make test`
-- [ ] run tests with race detector: `make test-race`
-- [ ] run linter: `make lint` — all issues must be fixed
-- [ ] run formatter: `make fmt`
+- [x] verify all 4 new actions implemented end-to-end (consumer API → hub queue → bridge apply → Bear)
+- [x] verify xcallback test coverage gaps are filled
+- [x] run full test suite: `make test`
+- [x] run tests with race detector: `make test-race`
+- [x] run linter: `make lint` — all issues must be fixed
+- [x] run formatter: `make fmt`
 
 ### Task 15: [Final] Update documentation
 - [ ] update CLAUDE.md to mention new write actions (add_file, archive, rename_tag, delete_tag)
