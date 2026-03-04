@@ -12,7 +12,7 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - internal/hubclient/ — HTTP client for hub API (bridge only)
 - internal/store/ — SQLite store for hub (hub only)
 - internal/api/ — HTTP handlers with chi router (hub only)
-- internal/xcallback/ — Bear x-callback-url executor via xcall CLI (bridge only)
+- internal/xcallback/ — Bear x-callback-url executor via bear-xcall CLI (bridge only)
 - deploy/ — deployment configs (systemd unit, launchd plist, Caddyfile)
 - testdata/ — test fixtures (test Bear SQLite)
 
@@ -61,7 +61,7 @@ Run these checks before committing (in order):
 
 - Bear is source-of-truth for user content
 - Hub is read replica + write queue for external consumers
-- Write flow: consumer → hub write_queue → bridge lease → xcall to Bear → ack
+- Write flow: consumer → hub write_queue → bridge lease → bear-xcall to Bear → ack
 - Read flow: Bear → bridge delta export → hub sync/push → consumer API
 - Delivery: effectively-once (consumer→hub), at-least-once (hub→bridge), duplicate-safe (bridge apply)
 

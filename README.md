@@ -8,7 +8,7 @@ Syncs Bear notes with external consumers. Two components: **hub** (API server on
 
 **Bear** — source of truth for all note content. Stores notes in a local SQLite database (Core Data schema). The bridge reads this database directly and applies writes via Bear's x-callback-url scheme.
 
-**Bridge** (`bin/bear-bridge`) — Mac agent that runs on the same machine as Bear. Runs once per invocation (scheduled via launchd). Reads Bear's SQLite, detects changes since the last run, pushes them to the hub, and pulls pending write operations from the hub to apply back to Bear via xcall.
+**Bridge** (`bin/bear-bridge`) — Mac agent that runs on the same machine as Bear. Runs once per invocation (scheduled via launchd). Reads Bear's SQLite, detects changes since the last run, pushes them to the hub, and pulls pending write operations from the hub to apply back to Bear via bear-xcall.
 
 **Hub** (`bin/bear-sync-hub`) — API server that runs on a VPS. Acts as a read replica of Bear's notes and exposes a REST API for external consumers. Holds a write queue for consumer-initiated changes that need to propagate back to Bear.
 
@@ -21,7 +21,7 @@ graph TB
     subgraph mac["Mac (user's machine)"]
         Bear["Bear.app\n(SQLite source of truth)"]
         Bridge["bear-bridge\n(launchd, every 5 min)"]
-        xcall["xcall CLI\n(x-callback-url executor)"]
+        bearxcall["bear-xcall CLI\n(x-callback-url executor)"]
     end
 
     subgraph vps["VPS"]
@@ -32,8 +32,8 @@ graph TB
     Consumer["Consumer\n(API client)"]
 
     Bridge -- "reads Bear SQLite\n(read-only)" --> Bear
-    Bridge -- "applies writes via\nbear:// URL scheme" --> xcall
-    xcall -- "x-callback-url" --> Bear
+    Bridge -- "applies writes via\nbear:// URL scheme" --> bearxcall
+    bearxcall -- "x-callback-url" --> Bear
     Bridge -- "POST /api/sync/push\n(bridge token)" --> Caddy
     Bridge -- "GET /api/sync/queue\nPOST /api/sync/ack" --> Caddy
     Caddy --> Hub
@@ -65,7 +65,7 @@ While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`b
 
 - Go 1.24+
 - Bear.app (for bridge)
-- [xcall](https://github.com/nicoulaj/xcall) CLI (for bridge write operations)
+- bear-xcall CLI (built via `make build-xcall`, for bridge write operations)
 
 ## Build
 

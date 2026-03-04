@@ -113,9 +113,9 @@
 - [x] run formatter: `make fmt`
 
 ### Task 7: [Final] Update documentation
-- [ ] update CLAUDE.md to mention bear-xcall instead of xcall
-- [ ] update README.md if xcall is mentioned
-- [ ] update deploy/ docs if xcall installation instructions exist
+- [x] update CLAUDE.md to mention bear-xcall instead of xcall
+- [x] update README.md if xcall is mentioned
+- [x] update deploy/ docs if xcall installation instructions exist
 
 ## Technical Details
 
