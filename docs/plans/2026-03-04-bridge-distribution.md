@@ -73,14 +73,14 @@
 - [x] Run tests — must pass before next task
 
 ### Task 4: Add GitHub Release publishing step
-- [ ] Add workflow step: create final archive after signing/notarization
-- [ ] Add workflow step: generate SHA256 checksum for archive
-- [ ] Add workflow step: create GitHub Release using `softprops/action-gh-release` action
+- [x] Add workflow step: create final archive after signing/notarization
+- [x] Add workflow step: generate SHA256 checksum for archive
+- [x] Add workflow step: create GitHub Release using `softprops/action-gh-release` action
   - Title: tag name (e.g., `v0.1.0`)
   - Body: auto-generated from commits or changelog
   - Assets: `.tar.gz` archive + `.sha256` checksum file
-- [ ] Add amd64 build support (Intel Mac) — build matrix or universal binary via `lipo`
-- [ ] Test with a pre-release tag (e.g., `v0.0.1-rc.1`) to validate full pipeline
+- [x] Add amd64 build support (Intel Mac) — build matrix or universal binary via `lipo`
+- [x] Test with a pre-release tag (e.g., `v0.0.1-rc.1`) to validate full pipeline
 
 ### Task 5: Update Makefile install-bridge for downloaded releases
 - [ ] Ensure `make install-bridge` works from extracted archive (not just from repo root)

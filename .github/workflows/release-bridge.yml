@@ -24,6 +24,15 @@ permissions:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        include:
+          - goarch: arm64
+            arch_name: arm64
+            swift_extra_flags: ""
+          - goarch: amd64
+            arch_name: amd64
+            swift_extra_flags: "-target x86_64-apple-macosx10.15"
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,12 +46,16 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Build bridge binary
+        env:
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
         run: go build -ldflags "-X main.version=${{ steps.version.outputs.version }}" -o bin/bear-bridge ./cmd/bridge
 
       - name: Build bear-xcall.app
         run: |
           mkdir -p bin/bear-xcall.app/Contents/MacOS
-          swiftc -o bin/bear-xcall.app/Contents/MacOS/bear-xcall tools/bear-xcall/main.swift
+          # shellcheck disable=SC2086
+          swiftc ${{ matrix.swift_extra_flags }} -o bin/bear-xcall.app/Contents/MacOS/bear-xcall tools/bear-xcall/main.swift
           cp tools/bear-xcall/Info.plist bin/bear-xcall.app/Contents/
 
       - name: Import code signing certificate
@@ -106,10 +119,6 @@ jobs:
         run: |
           # Create a zip containing both signed artifacts for notarization
           NOTARIZE_ZIP="$RUNNER_TEMP/notarize.zip"
-          ditto -c -k --keepParent bin/bear-bridge "$RUNNER_TEMP/bear-bridge.zip"
-          ditto -c -k --keepParent bin/bear-xcall.app "$RUNNER_TEMP/bear-xcall.zip"
-
-          # Combine into a single zip for submission
           mkdir -p "$RUNNER_TEMP/notarize-payload"
           cp bin/bear-bridge "$RUNNER_TEMP/notarize-payload/"
           cp -R bin/bear-xcall.app "$RUNNER_TEMP/notarize-payload/"
@@ -137,22 +146,30 @@ jobs:
 
       - name: Create release archive
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          ARCHIVE_DIR="bear-bridge-${VERSION}-darwin-arm64"
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCHIVE_NAME="bear-bridge-${VERSION}-darwin-${{ matrix.arch_name }}.tar.gz"
+          ARCHIVE_DIR="bear-bridge-${VERSION}-darwin-${{ matrix.arch_name }}"
           mkdir -p "${ARCHIVE_DIR}"
           cp bin/bear-bridge "${ARCHIVE_DIR}/"
           cp -R bin/bear-xcall.app "${ARCHIVE_DIR}/"
           cp deploy/com.romancha.bear-bridge.plist "${ARCHIVE_DIR}/"
           cp deploy/bear-bridge-wrapper.sh "${ARCHIVE_DIR}/"
           cp Makefile "${ARCHIVE_DIR}/"
-          tar -czf "${ARCHIVE_DIR}.tar.gz" "${ARCHIVE_DIR}"
-          echo "ARCHIVE_NAME=${ARCHIVE_DIR}.tar.gz" >> "$GITHUB_ENV"
+          tar -czf "${ARCHIVE_NAME}" "${ARCHIVE_DIR}"
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
 
-      - name: Upload release archive
+      - name: Generate SHA256 checksum
+        run: |
+          shasum -a 256 "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
+          cat "${ARCHIVE_NAME}.sha256"
+
+      - name: Upload release assets
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-darwin-arm64
-          path: ${{ env.ARCHIVE_NAME }}
+          name: bridge-darwin-${{ matrix.arch_name }}
+          path: |
+            ${{ env.ARCHIVE_NAME }}
+            ${{ env.ARCHIVE_NAME }}.sha256
           retention-days: 5
 
       - name: Cleanup keychain
@@ -161,3 +178,26 @@ jobs:
           if [ -f "$KEYCHAIN_PATH" ]; then
             security delete-keychain "$KEYCHAIN_PATH"
           fi
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la bear-bridge-*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            bear-bridge-*.tar.gz
+            bear-bridge-*.sha256
