@@ -116,7 +116,8 @@ bear-bridge-v0.1.0-darwin-arm64.tar.gz
 ├── com.romancha.bear-bridge.plist
 ├── bear-bridge-wrapper.sh
 ├── .env.bridge.example
-└── install.sh               # simplified installer (alternative to Makefile)
+├── entitlements.plist        # bear-xcall entitlements for re-signing
+└── Makefile                  # for `make install-bridge`
 ```
 
 ### Code signing flow in CI

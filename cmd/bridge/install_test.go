@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,8 @@ func TestMakefileArchiveDetection(t *testing.T) {
 		//nolint:gosec // trusted command with test-controlled args
 		cmd := exec.CommandContext(context.Background(), "make", "-n", "-f", makefilePath, "-C", repoRoot, "install-bridge")
 		cmd.Env = append(os.Environ(), "HOME=/tmp/test-home")
-		out, _ := cmd.CombinedOutput()
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "make -n failed: %s", out)
 		output := string(out)
 
 		// "cp bin/bear-bridge" = source path with bin/ prefix (repo build output)
@@ -46,7 +46,8 @@ func TestMakefileArchiveDetection(t *testing.T) {
 		//nolint:gosec // trusted command with test-controlled args
 		cmd := exec.CommandContext(context.Background(), "make", "-n", "-C", archiveDir, "install-bridge")
 		cmd.Env = append(os.Environ(), "HOME=/tmp/test-home")
-		out, _ := cmd.CombinedOutput()
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "make -n failed: %s", out)
 		output := string(out)
 
 		// "cp bear-bridge" without bin/ prefix = archive root path
@@ -68,7 +69,8 @@ func TestMakefileVerifyBridgeTarget(t *testing.T) {
 	//nolint:gosec // trusted command with test-controlled args
 	cmd := exec.CommandContext(context.Background(), "make", "-n", "-C", repoRoot, "verify-bridge")
 	cmd.Env = append(os.Environ(), "HOME=/tmp/test-home")
-	out, _ := cmd.CombinedOutput()
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "make -n failed: %s", out)
 	output := string(out)
 
 	assert.Contains(t, output, "codesign --verify", "verify-bridge should run codesign --verify")
@@ -89,6 +91,8 @@ func TestEnvBridgeExampleExists(t *testing.T) {
 	assert.Contains(t, text, "BRIDGE_HUB_URL", "should contain BRIDGE_HUB_URL")
 	assert.Contains(t, text, "BRIDGE_HUB_TOKEN", "should contain BRIDGE_HUB_TOKEN")
 	assert.Contains(t, text, "BEAR_TOKEN", "should contain BEAR_TOKEN")
+	assert.Contains(t, text, "BRIDGE_STATE_PATH", "should contain BRIDGE_STATE_PATH")
+	assert.Contains(t, text, "BEAR_DB_DIR", "should contain BEAR_DB_DIR")
 }
 
 // findRepoRoot walks up from the current directory to find the repository root.
@@ -103,15 +107,7 @@ func findRepoRoot(t *testing.T) string {
 			return dir
 		}
 		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
+		require.NotEqual(t, parent, dir, "could not find repo root (no go.mod found)")
 		dir = parent
 	}
-
-	// Fallback: try using git rev-parse.
-	//nolint:gosec // trusted git command
-	out, err := exec.CommandContext(context.Background(), "git", "rev-parse", "--show-toplevel").Output()
-	require.NoError(t, err, "could not find repo root")
-	return strings.TrimSpace(string(out))
 }

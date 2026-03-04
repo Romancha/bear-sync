@@ -21,7 +21,7 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 
 ## Commands
 
-- make build — build both binaries to bin/
+- make build — build both binaries to bin/ (accepts VERSION=vX.Y.Z for bridge version injection, default: dev)
 - make test — run all tests
 - make test-coverage — run tests with coverage report
 - make test-race — run tests with race detector
@@ -32,6 +32,9 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - make generate — run go generate (moq)
 - make swagger — generate Swagger docs (swag init)
 - make test-xcall — run bear-xcall manual tests (macOS + Bear required)
+- make install-bridge — install bridge + launchd agent to ~/bin/ (macOS only, works from repo or release archive)
+- make uninstall-bridge — uninstall bridge + launchd agent (macOS only)
+- make verify-bridge — verify installed bridge code signatures (macOS only)
 
 ## After Making Changes
 
@@ -57,6 +60,7 @@ Run these checks before committing (in order):
 - Tests with github.com/stretchr/testify (assert/require)
 - Line length limit: 140 characters
 - SQLite via modernc.org/sqlite (pure Go, no CGO)
+- Makefile dual-context detection: checks for `go.mod` to distinguish repo (build from source) vs release archive (pre-built signed binaries); adjusts source paths and build dependencies accordingly
 
 ## Database
 
@@ -100,3 +104,9 @@ Run these checks before committing (in order):
 - `junction_full_scan_counter`: incremented every cycle; triggers full junction table scan every 12 cycles (`junctionFullScanInterval`)
 - `known_*_ids`: Bear UUIDs seen on last sync; diffed against current Bear DB to produce `deleted_*_ids` in push requests
 - Absent state file → initial sync (full export in 50-note batches); state written atomically (write to `.tmp` then `rename`)
+
+## CI/CD
+
+- `.github/workflows/ci.yml` — lint, test, test-race on push/PR
+- `.github/workflows/docker-publish.yml` — builds and pushes hub Docker image on v* tag
+- `.github/workflows/release-bridge.yml` — builds, signs, notarizes, and publishes bridge macOS binaries on v* tag (arm64 + amd64)

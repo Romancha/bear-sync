@@ -26,7 +26,20 @@ XCALL_SRC_APP = bin/bear-xcall.app
 PLIST_SRC = deploy/$(PLIST_LABEL).plist
 WRAPPER_SRC = deploy/bear-bridge-wrapper.sh
 ENV_EXAMPLE_SRC = deploy/.env.bridge.example
+ENTITLEMENTS_SRC = tools/bear-xcall/entitlements.plist
 IS_RELEASE_ARCHIVE = 0
+# Go tools path
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/bin
+else
+GOBIN=$(shell go env GOBIN)
+endif
+# Tool binaries
+GOLANGCI_LINT=$(GOBIN)/golangci-lint
+GOFUMPT=$(GOBIN)/gofumpt
+GOIMPORTS=$(GOBIN)/goimports
+MOQ=$(GOBIN)/moq
+SWAG=$(GOBIN)/swag
 else
 # Release archive context — pre-built signed binaries
 INSTALL_BRIDGE_DEPS =
@@ -35,22 +48,9 @@ XCALL_SRC_APP = bear-xcall.app
 PLIST_SRC = $(PLIST_LABEL).plist
 WRAPPER_SRC = bear-bridge-wrapper.sh
 ENV_EXAMPLE_SRC = .env.bridge.example
+ENTITLEMENTS_SRC = entitlements.plist
 IS_RELEASE_ARCHIVE = 1
 endif
-
-# Go tools path
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
-# Tool binaries
-GOLANGCI_LINT=$(GOBIN)/golangci-lint
-GOFUMPT=$(GOBIN)/gofumpt
-GOIMPORTS=$(GOBIN)/goimports
-MOQ=$(GOBIN)/moq
-SWAG=$(GOBIN)/swag
 
 # Default target
 all: test build
@@ -171,7 +171,7 @@ ifeq ($(IS_RELEASE_ARCHIVE),1)
 		echo "bear-xcall.app already signed, skipping re-sign"; \
 	else \
 		echo "Signing bear-xcall.app with identity $(CODESIGN_IDENTITY)..."; \
-		codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --options runtime $(BRIDGE_BIN_DIR)/bear-xcall.app; \
+		codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements $(ENTITLEMENTS_SRC) --options runtime $(BRIDGE_BIN_DIR)/bear-xcall.app; \
 	fi
 else
 	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements tools/bear-xcall/entitlements.plist --options runtime $(BRIDGE_BIN_DIR)/bear-xcall.app

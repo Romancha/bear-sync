@@ -90,22 +90,26 @@ jobs:
           # shellcheck disable=SC2086
           security list-keychains -d user -s "$KEYCHAIN_PATH" $EXISTING_KEYCHAINS
 
+          # Extract signing identity from imported certificate
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No Developer ID Application identity found in keychain"
+            exit 1
+          fi
+          echo "Found signing identity: $IDENTITY"
+          echo "CODESIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
       - name: Sign bear-bridge binary
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          codesign --force --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+          codesign --force --sign "$CODESIGN_IDENTITY" \
             --options runtime \
             --timestamp \
             bin/bear-bridge
 
       - name: Sign bear-xcall.app
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          codesign --force --deep --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+          codesign --force --deep --sign "$CODESIGN_IDENTITY" \
             --entitlements tools/bear-xcall/entitlements.plist \
             --options runtime \
             --timestamp \
@@ -155,6 +159,7 @@ jobs:
           cp deploy/com.romancha.bear-bridge.plist "${ARCHIVE_DIR}/"
           cp deploy/bear-bridge-wrapper.sh "${ARCHIVE_DIR}/"
           cp deploy/.env.bridge.example "${ARCHIVE_DIR}/"
+          cp tools/bear-xcall/entitlements.plist "${ARCHIVE_DIR}/"
           cp Makefile "${ARCHIVE_DIR}/"
           tar -czf "${ARCHIVE_NAME}" "${ARCHIVE_DIR}"
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
