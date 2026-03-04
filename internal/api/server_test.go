@@ -106,6 +106,21 @@ func readBodySlice(t *testing.T, resp *http.Response) []map[string]any {
 	return result
 }
 
+// --- HealthCheck tests ---
+
+func TestHealthCheck(t *testing.T) {
+	ts, _ := setupServer(t)
+
+	resp := doRequest(t, ts, http.MethodGet, "/healthz", nil, "", nil)
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body map[string]string
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "ok", body["status"])
+}
+
 // --- Auth tests ---
 
 func TestAuth_MissingHeader(t *testing.T) {

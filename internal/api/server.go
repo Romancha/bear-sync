@@ -53,10 +53,7 @@ func NewServer(s store.Store, consumerTokens map[string]string, bridgeToken, att
 	r.Use(middleware.Recoverer)
 	r.Use(requestLogger)
 
-	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	r.Get("/healthz", srv.healthCheck)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/notes", func(r chi.Router) {
@@ -122,6 +119,18 @@ func NewServer(s store.Store, consumerTokens map[string]string, bridgeToken, att
 // ServeHTTP implements http.Handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
+}
+
+// healthCheck godoc
+// @Summary Health check
+// @Description Returns health status of the hub server
+// @Tags System
+// @Produce json
+// @Success 200 {object} map[string]string
+// @Router /healthz [get]
+func (s *Server) healthCheck(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
 
 // --- Middleware ---

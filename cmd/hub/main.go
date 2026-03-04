@@ -18,6 +18,14 @@ import (
 	"github.com/romancha/bear-sync/internal/store"
 )
 
+// @title Bear Sync Hub API
+// @version 1.0
+// @description API for reading and writing Bear notes via the hub.
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Consumer Bearer token. Format: "Bearer {token}"
 func main() {
 	if err := run(); err != nil {
 		slog.Error("fatal error", "error", err)

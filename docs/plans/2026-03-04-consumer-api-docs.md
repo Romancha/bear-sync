@@ -52,10 +52,10 @@
 - [x] run `make test` — must pass before next task
 
 ### Task 2: Add API info annotations and extract healthCheck
-- [ ] add general API annotations above `main()` in `cmd/hub/main.go` (`@title`, `@version`, `@description`, `@BasePath`, `@securityDefinitions.apikey BearerAuth`)
-- [ ] extract inline healthz handler at `server.go:56-59` to `func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request)` with `@Router /healthz [get]` annotation
-- [ ] write test for `healthCheck` handler (returns 200 with `{"status":"ok"}`)
-- [ ] run `make test` — must pass before next task
+- [x] add general API annotations above `main()` in `cmd/hub/main.go` (`@title`, `@version`, `@description`, `@BasePath`, `@securityDefinitions.apikey BearerAuth`)
+- [x] extract inline healthz handler at `server.go:56-59` to `func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request)` with `@Router /healthz [get]` annotation
+- [x] write test for `healthCheck` handler (returns 200 with `{"status":"ok"}`)
+- [x] run `make test` — must pass before next task
 
 ### Task 3: Annotate notes_handler.go (8 handlers)
 - [ ] add `example` struct tags to `createNoteRequest` and `updateNoteRequest`
