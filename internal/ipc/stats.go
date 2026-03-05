@@ -85,7 +85,7 @@ func (st *StatsTracker) GetLogs(n int) []LogEntry {
 	defer st.mu.RUnlock()
 
 	if n <= 0 || len(st.logBuf) == 0 {
-		return nil
+		return []LogEntry{}
 	}
 
 	if n > len(st.logBuf) {

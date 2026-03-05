@@ -111,14 +111,16 @@ func TestStatsTracker_GetLogs_LimitN(t *testing.T) {
 func TestStatsTracker_GetLogs_Empty(t *testing.T) {
 	st := NewStatsTracker(10)
 	logs := st.GetLogs(5)
-	assert.Nil(t, logs)
+	assert.Empty(t, logs)
+	assert.NotNil(t, logs)
 }
 
 func TestStatsTracker_GetLogs_ZeroN(t *testing.T) {
 	st := NewStatsTracker(10)
 	st.AddLog(LogEntry{Msg: "a"})
 	logs := st.GetLogs(0)
-	assert.Nil(t, logs)
+	assert.Empty(t, logs)
+	assert.NotNil(t, logs)
 }
 
 func TestStatsTracker_TriggerSync(t *testing.T) {
