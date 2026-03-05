@@ -374,6 +374,15 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 	oldBody := note.Body
 	oldSyncStatus := note.SyncStatus
 	oldHubModifiedAt := note.HubModifiedAt
+	oldPendingBearTitle := note.PendingBearTitle
+	oldPendingBearBody := note.PendingBearBody
+
+	// Snapshot Bear's current title/body before consumer overwrites them.
+	// Used by field-level conflict detection in ProcessSyncPush.
+	bearTitle := note.Title
+	bearBody := note.Body
+	note.PendingBearTitle = &bearTitle
+	note.PendingBearBody = &bearBody
 
 	if req.Title != "" {
 		note.Title = req.Title
@@ -414,6 +423,8 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 		note.Body = oldBody
 		note.SyncStatus = oldSyncStatus
 		note.HubModifiedAt = oldHubModifiedAt
+		note.PendingBearTitle = oldPendingBearTitle
+		note.PendingBearBody = oldPendingBearBody
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
 			logNoteRestoreError(note.ID, err, restoreErr)
 		}

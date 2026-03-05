@@ -54,11 +54,11 @@ Replace timestamp-only conflict detection with field-level content comparison. C
 
 ### Task 2: Populate pending_bear columns on sync_status transition to pending_to_bear
 
-- [ ] Write test: after consumer `updateNote()`, verify `pending_bear_title` and `pending_bear_body` contain the pre-update Bear values
-- [ ] Write test: after consumer `createNote()`, verify `pending_bear_title` and `pending_bear_body` are empty (new note has no Bear base)
-- [ ] In `updateNote()` handler (`notes_handler.go`): before overwriting title/body, save current values to `note.PendingBearTitle` / `note.PendingBearBody`
-- [ ] Ensure rollback logic also restores pending_bear fields on enqueue failure
-- [ ] Run tests — must pass before next task
+- [x] Write test: after consumer `updateNote()`, verify `pending_bear_title` and `pending_bear_body` contain the pre-update Bear values
+- [x] Write test: after consumer `createNote()`, verify `pending_bear_title` and `pending_bear_body` are empty (new note has no Bear base)
+- [x] In `updateNote()` handler (`notes_handler.go`): before overwriting title/body, save current values to `note.PendingBearTitle` / `note.PendingBearBody`
+- [x] Ensure rollback logic also restores pending_bear fields on enqueue failure
+- [x] Run tests — must pass before next task
 
 ### Task 3: Clear pending_bear columns on sync_status transition to synced
 

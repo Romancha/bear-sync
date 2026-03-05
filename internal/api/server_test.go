@@ -1588,6 +1588,84 @@ func TestAddTag_QueueItemHasConsumerID(t *testing.T) {
 	assert.Equal(t, "tagger", items[0].ConsumerID)
 }
 
+func TestUpdateNote_PopulatesPendingBearFields(t *testing.T) {
+	_, s := setupServer(t)
+
+	bearID := "bear-note-pending"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-pb", Title: "Bear Title", Body: "Bear Body", BearID: &bearID,
+	}))
+
+	// Simulate consumer update via the handler by doing what the handler does:
+	// get note, save pending_bear fields, update title/body, set sync_status.
+	note, err := s.GetNote(t.Context(), "note-pb")
+	require.NoError(t, err)
+
+	// Save Bear's current values before consumer overwrites.
+	note.PendingBearTitle = strPtr(note.Title)
+	note.PendingBearBody = strPtr(note.Body)
+	note.Title = "Consumer Title"
+	note.Body = "Consumer Body"
+	note.SyncStatus = "pending_to_bear"
+
+	require.NoError(t, s.UpdateNote(t.Context(), note))
+
+	// Verify pending_bear fields contain the pre-update Bear values.
+	updated, err := s.GetNote(t.Context(), "note-pb")
+	require.NoError(t, err)
+	assert.Equal(t, "Consumer Title", updated.Title)
+	assert.Equal(t, "Consumer Body", updated.Body)
+	assert.Equal(t, "pending_to_bear", updated.SyncStatus)
+	require.NotNil(t, updated.PendingBearTitle)
+	require.NotNil(t, updated.PendingBearBody)
+	assert.Equal(t, "Bear Title", *updated.PendingBearTitle)
+	assert.Equal(t, "Bear Body", *updated.PendingBearBody)
+}
+
+func TestUpdateNote_PendingBearFieldsViaHTTP(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-http-pb"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-http-pb", Title: "Original Title", Body: "Original Body", BearID: &bearID,
+	}))
+
+	body := map[string]string{"title": "Updated Title", "body": "Updated Body"}
+	resp := doRequest(t, ts, http.MethodPut, "/api/notes/note-http-pb", body, consumerToken,
+		map[string]string{"Idempotency-Key": "key-pb-http"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Verify pending_bear fields were saved with pre-update values.
+	note, err := s.GetNote(t.Context(), "note-http-pb")
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Title", note.Title)
+	assert.Equal(t, "Updated Body", note.Body)
+	require.NotNil(t, note.PendingBearTitle, "pending_bear_title should be set after consumer update")
+	require.NotNil(t, note.PendingBearBody, "pending_bear_body should be set after consumer update")
+	assert.Equal(t, "Original Title", *note.PendingBearTitle)
+	assert.Equal(t, "Original Body", *note.PendingBearBody)
+}
+
+func TestCreateNote_PendingBearFieldsEmpty(t *testing.T) {
+	_, s := setupServer(t)
+
+	note := &models.Note{
+		ID:         "note-create-pb",
+		Title:      "New Note",
+		Body:       "New Body",
+		SyncStatus: "pending_to_bear",
+	}
+
+	require.NoError(t, s.CreateNote(t.Context(), note))
+
+	created, err := s.GetNote(t.Context(), "note-create-pb")
+	require.NoError(t, err)
+	assert.Nil(t, created.PendingBearTitle, "pending_bear_title should be nil for new notes")
+	assert.Nil(t, created.PendingBearBody, "pending_bear_body should be nil for new notes")
+}
+
 func TestSyncStatus_WithConflicts(t *testing.T) {
 	ts, s := setupServer(t)
 
@@ -1608,3 +1686,5 @@ func TestSyncStatus_WithConflicts(t *testing.T) {
 	require.Len(t, conflictIDs, 1)
 	assert.Equal(t, "n1", conflictIDs[0])
 }
+
+func strPtr(s string) *string { return &s }
