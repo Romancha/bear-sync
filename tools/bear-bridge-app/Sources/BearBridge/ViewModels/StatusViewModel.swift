@@ -79,6 +79,10 @@ final class StatusViewModel: ObservableObject {
                 queueItems = queueResponse.items
             }
         } catch {
+            if bridgeConnected {
+                syncStatus = .error
+                lastError = "Bridge disconnected"
+            }
             bridgeConnected = false
         }
     }
@@ -89,7 +93,15 @@ final class StatusViewModel: ObservableObject {
         isSyncing = true
         syncStatus = .syncing
         do {
-            _ = try await ipcClient.syncNow()
+            let response = try await ipcClient.syncNow()
+            if !response.ok {
+                let errorMsg = response.error ?? "sync_now command failed"
+                lastError = errorMsg
+                syncStatus = .error
+                notificationService?.showSyncError(errorMsg)
+                isSyncing = false
+                return
+            }
             // After triggering, poll immediately to get updated state
             try? await Task.sleep(nanoseconds: 500_000_000)
             await refreshStatus()

@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarView: View {
     @ObservedObject var viewModel: StatusViewModel
     @ObservedObject var logViewModel: LogViewModel
+    @ObservedObject var settingsManager: SettingsManager
     let processManager: BridgeProcessManager
     @Environment(\.openWindow) private var openWindow
 
@@ -42,6 +43,21 @@ struct MenuBarView: View {
     private var syncButton: some View {
         Button {
             Task {
+                if processManager.state == .stopped {
+                    guard settingsManager.isConfigured else {
+                        viewModel.lastError = "Configure connection settings before syncing"
+                        viewModel.syncStatus = .error
+                        return
+                    }
+                    do {
+                        try processManager.start()
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    } catch {
+                        viewModel.lastError = "Failed to start bridge: \(error.localizedDescription)"
+                        viewModel.syncStatus = .error
+                        return
+                    }
+                }
                 await viewModel.syncNow()
             }
         } label: {

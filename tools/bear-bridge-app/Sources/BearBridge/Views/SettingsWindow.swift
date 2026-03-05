@@ -24,6 +24,20 @@ struct SettingsWindow: View {
         .onAppear {
             settings.refreshLoginItemStatus()
         }
+        .alert("Settings Error", isPresented: hasSettingsError) {
+            Button("OK") {
+                settings.lastSettingsError = nil
+            }
+        } message: {
+            Text(settings.lastSettingsError ?? "")
+        }
+    }
+
+    private var hasSettingsError: Binding<Bool> {
+        Binding(
+            get: { settings.lastSettingsError != nil },
+            set: { if !$0 { settings.lastSettingsError = nil } }
+        )
     }
 
     // MARK: - Connection tab
@@ -80,8 +94,6 @@ struct SettingsWindow: View {
                     )
                     .frame(width: 200)
                 }
-
-                Toggle("Sync on app launch", isOn: $settings.syncOnLaunch)
             } header: {
                 Text("Sync Schedule")
             }

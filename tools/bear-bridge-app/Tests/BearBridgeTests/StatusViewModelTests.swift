@@ -195,6 +195,21 @@ final class StatusViewModelTests: XCTestCase {
         mock.statusResponse = nil
         await vm.refreshStatus()
         XCTAssertFalse(vm.bridgeConnected)
+        XCTAssertEqual(vm.syncStatus, .error)
+        XCTAssertEqual(vm.lastError, "Bridge disconnected")
+    }
+
+    func testRefreshStatusDoesNotSetErrorWhenNeverConnected() async {
+        let mock = MockIPCClient()
+        mock.shouldThrow = IPCClientError.socketNotAvailable
+        let vm = StatusViewModel(ipcClient: mock)
+
+        await vm.refreshStatus()
+
+        XCTAssertFalse(vm.bridgeConnected)
+        // Should NOT set error status when bridge was never connected
+        XCTAssertEqual(vm.syncStatus, .idle)
+        XCTAssertNil(vm.lastError)
     }
 
     func testRefreshStatusWithUnknownStateFallsToIdle() async {
@@ -289,6 +304,30 @@ final class StatusViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.syncStatus, .error)
         XCTAssertNotNil(vm.lastError)
+        XCTAssertFalse(vm.isSyncing)
+    }
+
+    func testSyncNowHandlesOkFalse() async {
+        let mock = MockIPCClient()
+        mock.syncNowResponse = IPCOkResponse(ok: false, error: "sync already in progress")
+        let vm = StatusViewModel(ipcClient: mock)
+
+        await vm.syncNow()
+
+        XCTAssertEqual(vm.syncStatus, .error)
+        XCTAssertEqual(vm.lastError, "sync already in progress")
+        XCTAssertFalse(vm.isSyncing)
+    }
+
+    func testSyncNowHandlesOkFalseWithoutErrorMessage() async {
+        let mock = MockIPCClient()
+        mock.syncNowResponse = IPCOkResponse(ok: false, error: nil)
+        let vm = StatusViewModel(ipcClient: mock)
+
+        await vm.syncNow()
+
+        XCTAssertEqual(vm.syncStatus, .error)
+        XCTAssertEqual(vm.lastError, "sync_now command failed")
         XCTAssertFalse(vm.isSyncing)
     }
 

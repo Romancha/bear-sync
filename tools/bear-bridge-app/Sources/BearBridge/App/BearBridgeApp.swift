@@ -59,7 +59,7 @@ struct BearBridgeApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(viewModel: viewModel, logViewModel: logViewModel, processManager: processManager)
+            MenuBarView(viewModel: viewModel, logViewModel: logViewModel, settingsManager: settingsManager, processManager: processManager)
                 .onAppear {
                     viewModel.startPolling()
                 }
@@ -68,6 +68,9 @@ struct BearBridgeApp: App {
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .openLogViewer)) { _ in
                     openWindow(id: "log-viewer")
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    processManager.stop()
                 }
         } label: {
             Image(systemName: menuBarIcon)

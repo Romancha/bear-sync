@@ -98,7 +98,6 @@ final class SettingsManagerTests: XCTestCase {
 
         XCTAssertEqual(manager.hubURL, "")
         XCTAssertEqual(manager.syncIntervalMinutes, SettingsManager.defaultSyncIntervalMinutes)
-        XCTAssertTrue(manager.syncOnLaunch)
         XCTAssertFalse(manager.launchAtLogin)
         XCTAssertTrue(manager.notificationsEnabled)
     }
@@ -130,14 +129,6 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertEqual(manager.syncIntervalMinutes, 15)
     }
 
-    func testLoadsSavedSyncOnLaunch() {
-        let store = MockSettingsStore()
-        store.storage[SettingsKey.syncOnLaunch] = false
-        let (manager, _, _, _) = makeManager(store: store)
-
-        XCTAssertFalse(manager.syncOnLaunch)
-    }
-
     func testLoadsSavedNotificationsEnabled() {
         let store = MockSettingsStore()
         store.storage[SettingsKey.notificationsEnabled] = false
@@ -158,12 +149,6 @@ final class SettingsManagerTests: XCTestCase {
         let (manager, store, _, _) = makeManager()
         manager.syncIntervalMinutes = 10
         XCTAssertEqual(store.storage[SettingsKey.syncIntervalMinutes] as? Int, 10)
-    }
-
-    func testSyncOnLaunchPersistsOnChange() {
-        let (manager, store, _, _) = makeManager()
-        manager.syncOnLaunch = false
-        XCTAssertEqual(store.storage[SettingsKey.syncOnLaunch] as? Bool, false)
     }
 
     func testLaunchAtLoginPersistsOnChange() {
@@ -357,6 +342,30 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertTrue(manager.launchAtLogin)
     }
 
+    func testRefreshLoginItemStatusDoesNotCallSetEnabled() {
+        let loginItem = MockLoginItemManager()
+        loginItem.isEnabled = true
+        let (manager, _, _, _) = makeManager(loginItem: loginItem)
+
+        let callsBefore = loginItem.setEnabledCallCount
+        manager.refreshLoginItemStatus()
+
+        // Refresh should NOT call setEnabled back to the system
+        XCTAssertEqual(loginItem.setEnabledCallCount, callsBefore)
+        XCTAssertTrue(manager.launchAtLogin)
+    }
+
+    func testRefreshLoginItemStatusPersistsToStore() {
+        let loginItem = MockLoginItemManager()
+        loginItem.isEnabled = true
+        let (manager, store, _, _) = makeManager(loginItem: loginItem)
+
+        manager.refreshLoginItemStatus()
+
+        // Should persist the system state to the store
+        XCTAssertEqual(store.storage[SettingsKey.launchAtLogin] as? Bool, true)
+    }
+
     func testRefreshLoginItemStatusNoChangeWhenMatching() {
         let loginItem = MockLoginItemManager()
         loginItem.isEnabled = false
@@ -376,9 +385,65 @@ final class SettingsManagerTests: XCTestCase {
         _ = SettingsManager(store: store, keychain: MockKeychainService(), loginItemManager: MockLoginItemManager())
 
         XCTAssertEqual(store.defaults[SettingsKey.syncIntervalMinutes] as? Int, 5)
-        XCTAssertEqual(store.defaults[SettingsKey.syncOnLaunch] as? Bool, true)
         XCTAssertEqual(store.defaults[SettingsKey.launchAtLogin] as? Bool, false)
         XCTAssertEqual(store.defaults[SettingsKey.notificationsEnabled] as? Bool, true)
+    }
+
+    // MARK: - Error surfacing
+
+    func testKeychainSaveErrorSurfaced() {
+        let keychain = MockKeychainService()
+        keychain.shouldThrow = true
+        let (manager, _, _, _) = makeManager(keychain: keychain)
+
+        manager.hubToken = "new-token"
+
+        XCTAssertNotNil(manager.lastSettingsError)
+        XCTAssertTrue(manager.lastSettingsError?.contains("Keychain") ?? false)
+    }
+
+    func testBearTokenKeychainSaveErrorSurfaced() {
+        let keychain = MockKeychainService()
+        keychain.shouldThrow = true
+        let (manager, _, _, _) = makeManager(keychain: keychain)
+
+        manager.bearToken = "new-token"
+
+        XCTAssertNotNil(manager.lastSettingsError)
+        XCTAssertTrue(manager.lastSettingsError?.contains("Keychain") ?? false)
+    }
+
+    func testLaunchAtLoginErrorSurfaced() {
+        let loginItem = MockLoginItemManager()
+        loginItem.shouldThrow = true
+        let (manager, _, _, _) = makeManager(loginItem: loginItem)
+
+        manager.launchAtLogin = true
+
+        XCTAssertNotNil(manager.lastSettingsError)
+        XCTAssertTrue(manager.lastSettingsError?.contains("Launch at Login") ?? false)
+    }
+
+    func testLaunchAtLoginRevertsOnError() {
+        let loginItem = MockLoginItemManager()
+        loginItem.shouldThrow = true
+        let (manager, store, _, _) = makeManager(loginItem: loginItem)
+
+        // Default is false; try to enable (should fail and revert)
+        manager.launchAtLogin = true
+
+        // Value should be reverted in memory
+        XCTAssertFalse(manager.launchAtLogin)
+        // Store should NOT have been updated with the failed value
+        XCTAssertNil(store.storage[SettingsKey.launchAtLogin])
+    }
+
+    func testNoErrorOnSuccessfulKeychainSave() {
+        let (manager, _, _, _) = makeManager()
+
+        manager.hubToken = "valid-token"
+
+        XCTAssertNil(manager.lastSettingsError)
     }
 
     // MARK: - Multiple changes

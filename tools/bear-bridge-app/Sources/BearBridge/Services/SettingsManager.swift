@@ -5,7 +5,6 @@ import ServiceManagement
 enum SettingsKey {
     static let hubURL = "hubURL"
     static let syncIntervalMinutes = "syncIntervalMinutes"
-    static let syncOnLaunch = "syncOnLaunch"
     static let launchAtLogin = "launchAtLogin"
     static let notificationsEnabled = "notificationsEnabled"
 }
@@ -65,14 +64,19 @@ final class SettingsManager: ObservableObject {
         didSet { store.set(syncIntervalMinutes, forKey: SettingsKey.syncIntervalMinutes) }
     }
 
-    @Published var syncOnLaunch: Bool {
-        didSet { store.set(syncOnLaunch, forKey: SettingsKey.syncOnLaunch) }
-    }
-
     @Published var launchAtLogin: Bool {
         didSet {
+            guard !suppressLaunchAtLoginDidSet else { return }
+            do {
+                try loginItemManager?.setEnabled(launchAtLogin)
+            } catch {
+                lastSettingsError = "Failed to update Launch at Login: \(error.localizedDescription)"
+                suppressLaunchAtLoginDidSet = true
+                launchAtLogin = oldValue
+                suppressLaunchAtLoginDidSet = false
+                return
+            }
             store.set(launchAtLogin, forKey: SettingsKey.launchAtLogin)
-            try? loginItemManager?.setEnabled(launchAtLogin)
         }
     }
 
@@ -80,9 +84,12 @@ final class SettingsManager: ObservableObject {
         didSet { store.set(notificationsEnabled, forKey: SettingsKey.notificationsEnabled) }
     }
 
+    @Published var lastSettingsError: String?
+
     private let store: SettingsStore
     private let keychain: KeychainServiceProtocol
     private let loginItemManager: LoginItemManager?
+    private var suppressLaunchAtLoginDidSet = false
 
     /// - Parameters:
     ///   - store: Settings store (defaults to UserDefaults.standard).
@@ -99,7 +106,6 @@ final class SettingsManager: ObservableObject {
         // Register defaults before reading
         resolvedStore.register(defaults: [
             SettingsKey.syncIntervalMinutes: Self.defaultSyncIntervalMinutes,
-            SettingsKey.syncOnLaunch: true,
             SettingsKey.launchAtLogin: false,
             SettingsKey.notificationsEnabled: true,
         ])
@@ -118,7 +124,6 @@ final class SettingsManager: ObservableObject {
         // Load saved values
         self.hubURL = resolvedStore.string(forKey: SettingsKey.hubURL) ?? ""
         self.syncIntervalMinutes = resolvedStore.integer(forKey: SettingsKey.syncIntervalMinutes)
-        self.syncOnLaunch = resolvedStore.bool(forKey: SettingsKey.syncOnLaunch)
         self.launchAtLogin = resolvedStore.bool(forKey: SettingsKey.launchAtLogin)
         self.notificationsEnabled = resolvedStore.bool(forKey: SettingsKey.notificationsEnabled)
     }
@@ -131,7 +136,11 @@ final class SettingsManager: ObservableObject {
             if newValue.isEmpty {
                 keychain.delete(key: TokenKey.hubToken)
             } else {
-                try? keychain.save(key: TokenKey.hubToken, value: newValue)
+                do {
+                    try keychain.save(key: TokenKey.hubToken, value: newValue)
+                } catch {
+                    lastSettingsError = "Failed to save hub token to Keychain: \(error.localizedDescription)"
+                }
             }
             objectWillChange.send()
         }
@@ -143,7 +152,11 @@ final class SettingsManager: ObservableObject {
             if newValue.isEmpty {
                 keychain.delete(key: TokenKey.bearToken)
             } else {
-                try? keychain.save(key: TokenKey.bearToken, value: newValue)
+                do {
+                    try keychain.save(key: TokenKey.bearToken, value: newValue)
+                } catch {
+                    lastSettingsError = "Failed to save Bear token to Keychain: \(error.localizedDescription)"
+                }
             }
             objectWillChange.send()
         }
@@ -180,11 +193,15 @@ final class SettingsManager: ObservableObject {
     // MARK: - Launch at Login state sync
 
     /// Refreshes launchAtLogin from the system state (in case user changed it in System Settings).
+    /// Bypasses didSet to avoid calling setEnabled back to the system.
     func refreshLoginItemStatus() {
         if let manager = loginItemManager {
             let systemState = manager.isEnabled
             if launchAtLogin != systemState {
+                suppressLaunchAtLoginDidSet = true
                 launchAtLogin = systemState
+                suppressLaunchAtLoginDidSet = false
+                store.set(launchAtLogin, forKey: SettingsKey.launchAtLogin)
             }
         }
     }
