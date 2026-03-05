@@ -49,6 +49,7 @@ type config struct {
 	statePath    string
 	bearDBDir    string
 	syncInterval time.Duration
+	ipcSocket    string
 }
 
 func loadConfig() (*config, error) {
@@ -86,6 +87,16 @@ func loadConfig() (*config, error) {
 			return nil, fmt.Errorf("get home dir: %w", err)
 		}
 		cfg.bearDBDir = home + "/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data"
+	}
+
+	if v := os.Getenv("BRIDGE_IPC_SOCKET"); v != "" {
+		cfg.ipcSocket = v
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("get home dir: %w", err)
+		}
+		cfg.ipcSocket = home + "/.bear-bridge.sock"
 	}
 
 	cfg.syncInterval = defaultSyncInterval
@@ -144,8 +155,8 @@ func run(logger *slog.Logger, daemonMode bool) error {
 	bridge := NewBridge(db, hub, xcall, cfg.bearToken, cfg.statePath, cfg.bearDBDir, logger)
 
 	if daemonMode {
-		logger.Info("entering daemon mode", "sync_interval", cfg.syncInterval)
-		return runDaemon(ctx, bridge, cfg.syncInterval, logger)
+		logger.Info("entering daemon mode", "sync_interval", cfg.syncInterval, "ipc_socket", cfg.ipcSocket)
+		return runDaemonWithIPC(ctx, bridge, cfg.syncInterval, cfg.ipcSocket, logger)
 	}
 
 	if err := bridge.Run(ctx); err != nil {

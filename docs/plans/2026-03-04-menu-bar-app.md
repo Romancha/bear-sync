@@ -45,18 +45,18 @@
 - [x] Run tests — must pass before next task
 
 ### Task 2: Add Unix socket IPC to bridge daemon
-- [ ] Create `internal/ipc/` package with Unix socket server
-- [ ] Socket path: `~/.bear-bridge.sock` (configurable via `BRIDGE_IPC_SOCKET`)
-- [ ] Implement JSON-based request/response protocol:
+- [x] Create `internal/ipc/` package with Unix socket server
+- [x] Socket path: `~/.bear-bridge.sock` (configurable via `BRIDGE_IPC_SOCKET`)
+- [x] Implement JSON-based request/response protocol:
   - `{"cmd":"status"}` → `{"state":"idle|syncing|error","last_sync":"...","last_error":"...","stats":{...}}`
   - `{"cmd":"sync_now"}` → triggers immediate sync, returns `{"ok":true}`
   - `{"cmd":"logs","lines":50}` → returns last N log entries
   - `{"cmd":"quit"}` → graceful shutdown
-- [ ] Add stats tracking to bridge: notes synced, tags synced, write queue items processed, last sync duration
-- [ ] Server only starts in `--daemon` mode
-- [ ] Write tests for IPC server (all commands, malformed input, concurrent connections)
-- [ ] Write tests for stats tracking
-- [ ] Run tests — must pass before next task
+- [x] Add stats tracking to bridge: notes synced, tags synced, write queue items processed, last sync duration
+- [x] Server only starts in `--daemon` mode
+- [x] Write tests for IPC server (all commands, malformed input, concurrent connections)
+- [x] Write tests for stats tracking
+- [x] Run tests — must pass before next task
 
 ### Task 3: Add structured status output to bridge sync
 - [ ] Emit structured JSON status events to stdout during sync:
