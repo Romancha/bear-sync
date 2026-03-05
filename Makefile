@@ -1,4 +1,4 @@
-.PHONY: build build-xcall build-app test test-coverage test-race test-xcall test-app lint fmt tidy clean generate tools swagger help all install-bridge uninstall-bridge install-app uninstall-app verify-bridge dmg
+.PHONY: build build-xcall build-app test test-coverage test-race test-xcall test-app lint fmt tidy clean generate tools swagger help all dmg
 
 BINARY_HUB=bear-sync-hub
 BINARY_BRIDGE=bear-bridge
@@ -9,30 +9,8 @@ VERSION ?= dev
 # Code signing identity for bear-xcall.app (use "Developer ID Application: ..." for distribution)
 CODESIGN_IDENTITY ?= -
 
-# Requirement for verifying Developer ID Application signatures (release archives).
-# Checks Apple root CA → Developer ID CA intermediate → Developer ID Application leaf.
-DEVID_REQ = anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] \
-  and certificate leaf[field.1.2.840.113635.100.6.1.13]
-
-# Bridge install paths
-PLIST_LABEL=com.romancha.bear-bridge
-PLIST_DST=$(HOME)/Library/LaunchAgents/$(PLIST_LABEL).plist
-BRIDGE_BIN_DIR=$(HOME)/bin
-BRIDGE_LOG_DIR=$(HOME)/Library/Logs/bear-bridge
-BRIDGE_CONFIG_DIR=$(HOME)/.config/bear-bridge
-
-# Detect release archive vs repository context.
-# In a release archive there is no go.mod — binaries and configs are at the root.
-ifneq ($(wildcard go.mod),)
-# Repository context — build from source
-INSTALL_BRIDGE_DEPS = build
-BRIDGE_SRC_BIN = bin/$(BINARY_BRIDGE)
-XCALL_SRC_APP = bin/bear-xcall.app
-PLIST_SRC = deploy/$(PLIST_LABEL).plist
-WRAPPER_SRC = deploy/bear-bridge-wrapper.sh
-ENV_EXAMPLE_SRC = deploy/.env.bridge.example
 ENTITLEMENTS_SRC = tools/bear-xcall/entitlements.plist
-IS_RELEASE_ARCHIVE = 0
+
 # Go tools path
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -45,24 +23,9 @@ GOFUMPT=$(GOBIN)/gofumpt
 GOIMPORTS=$(GOBIN)/goimports
 MOQ=$(GOBIN)/moq
 SWAG=$(GOBIN)/swag
-else
-# Release archive context — pre-built signed binaries
-INSTALL_BRIDGE_DEPS =
-BRIDGE_SRC_BIN = $(BINARY_BRIDGE)
-XCALL_SRC_APP = bear-xcall.app
-PLIST_SRC = $(PLIST_LABEL).plist
-WRAPPER_SRC = bear-bridge-wrapper.sh
-ENV_EXAMPLE_SRC = .env.bridge.example
-ENTITLEMENTS_SRC = entitlements.plist
-IS_RELEASE_ARCHIVE = 1
-endif
 
 # Default target
-ifneq ($(wildcard go.mod),)
 all: test build
-else
-all: install-bridge
-endif
 
 # Help
 help:
@@ -73,11 +36,6 @@ help:
 	@echo "    make build-xcall    - Build bear-xcall Swift CLI .app bundle (macOS only)"
 	@echo "    make build-app      - Build BearBridge menu bar .app bundle (macOS only)"
 	@echo "    make dmg            - Create BearBridge .dmg disk image (macOS only)"
-	@echo "    make install-bridge - Install bridge + launchd agent to ~/bin/ (macOS only)"
-	@echo "    make uninstall-bridge - Uninstall bridge + launchd agent (macOS only)"
-	@echo "    make install-app    - Install BearBridge.app to ~/Applications/ (macOS only)"
-	@echo "    make uninstall-app  - Uninstall BearBridge.app (macOS only)"
-	@echo "    make verify-bridge  - Verify installed bridge code signatures (macOS only)"
 	@echo ""
 	@echo "  Test:"
 	@echo "    make test           - Run all Go tests"
@@ -117,6 +75,7 @@ ifeq ($(shell uname),Darwin)
 		-scheme BearBridge -configuration Release \
 		CONFIGURATION_BUILD_DIR=$(CURDIR)/bin/xcodebuild-out \
 		CODE_SIGN_IDENTITY="$(CODESIGN_IDENTITY)" \
+		MACOSX_DEPLOYMENT_TARGET=14.0 \
 		build
 	@mkdir -p bin/BearBridge.app/Contents/MacOS
 	cp -R bin/xcodebuild-out/BearBridge.app/ bin/BearBridge.app/
@@ -143,6 +102,7 @@ ifeq ($(shell uname),Darwin)
 	@echo "Running BearBridge Swift tests..."
 	xcodebuild -project tools/bear-bridge-app/BearBridge.xcodeproj \
 		-scheme BearBridge \
+		MACOSX_DEPLOYMENT_TARGET=14.0 \
 		test
 else
 	@echo "Skipping BearBridge tests (macOS only)"
@@ -209,114 +169,3 @@ tools:
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
-install-bridge: $(INSTALL_BRIDGE_DEPS)
-ifeq ($(shell uname),Darwin)
-	@echo "Installing bear-bridge to $(BRIDGE_BIN_DIR)..."
-	@launchctl bootout gui/$$(id -u)/$(PLIST_LABEL) 2>/dev/null || true
-	@mkdir -p $(BRIDGE_BIN_DIR)
-	@mkdir -p $(BRIDGE_LOG_DIR)
-	@mkdir -p $(BRIDGE_CONFIG_DIR)
-ifeq ($(IS_RELEASE_ARCHIVE),1)
-	@if codesign --verify --deep --strict -R '$(DEVID_REQ)' $(BRIDGE_SRC_BIN) 2>/dev/null && \
-	    codesign --verify --deep --strict -R '$(DEVID_REQ)' $(XCALL_SRC_APP) 2>/dev/null; then \
-		echo "Code signatures valid (Developer ID)"; \
-	else \
-		echo "ERROR: Code signature verification failed."; \
-		echo "Binaries must be signed with a Developer ID Application certificate."; \
-		echo "The release archive may be corrupted or tampered with."; \
-		echo "Please re-download from GitHub Releases."; \
-		exit 1; \
-	fi
-endif
-	cp $(BRIDGE_SRC_BIN) $(BRIDGE_BIN_DIR)/
-	cp -R $(XCALL_SRC_APP) $(BRIDGE_BIN_DIR)/
-ifeq ($(IS_RELEASE_ARCHIVE),0)
-	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements $(ENTITLEMENTS_SRC) --options runtime $(BRIDGE_BIN_DIR)/bear-xcall.app
-endif
-	cp $(WRAPPER_SRC) $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
-	chmod +x $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
-	@if [ ! -f $(BRIDGE_CONFIG_DIR)/.env.bridge ]; then \
-		cp $(ENV_EXAMPLE_SRC) $(BRIDGE_CONFIG_DIR)/.env.bridge; \
-		echo "Created $(BRIDGE_CONFIG_DIR)/.env.bridge from template"; \
-	else \
-		echo "$(BRIDGE_CONFIG_DIR)/.env.bridge already exists, skipping"; \
-	fi
-	@echo "Installing launchd plist to $(PLIST_DST)..."
-	sed 's|__HOME__|$(HOME)|g' $(PLIST_SRC) > $(PLIST_DST)
-	@echo "Loading launchd agent..."
-	launchctl bootstrap gui/$$(id -u) $(PLIST_DST)
-	@echo ""
-	@echo "Installed. Edit your config:"
-	@echo "  nano $(BRIDGE_CONFIG_DIR)/.env.bridge"
-	@echo ""
-	@echo "Then reload the agent:"
-	@echo "  launchctl bootout gui/$$(id -u)/$(PLIST_LABEL)"
-	@echo "  launchctl bootstrap gui/$$(id -u) $(PLIST_DST)"
-else
-	@echo "install-bridge is macOS only"
-	@exit 1
-endif
-
-uninstall-bridge:
-ifeq ($(shell uname),Darwin)
-	@echo "Unloading launchd agent..."
-	@launchctl bootout gui/$$(id -u)/$(PLIST_LABEL) 2>/dev/null || true
-	@echo "Removing plist..."
-	rm -f $(PLIST_DST)
-	@echo "Removing binaries from $(BRIDGE_BIN_DIR)..."
-	rm -f $(BRIDGE_BIN_DIR)/$(BINARY_BRIDGE)
-	rm -rf $(BRIDGE_BIN_DIR)/bear-xcall.app
-	rm -f $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
-	@echo ""
-	@echo "Uninstalled. The following were NOT removed (manual cleanup if desired):"
-	@echo "  $(BRIDGE_CONFIG_DIR)/.env.bridge"
-	@echo "  $(HOME)/.bear-bridge-state.json"
-	@echo "  $(BRIDGE_LOG_DIR)/"
-else
-	@echo "uninstall-bridge is macOS only"
-	@exit 1
-endif
-
-install-app: build-app
-ifeq ($(shell uname),Darwin)
-	@echo "Installing BearBridge.app to $(HOME)/Applications/..."
-	@mkdir -p $(HOME)/Applications
-	rm -rf $(HOME)/Applications/BearBridge.app
-	cp -R bin/BearBridge.app $(HOME)/Applications/
-	@echo ""
-	@echo "BearBridge.app installed to $(HOME)/Applications/"
-	@echo "Launch it from Finder, Spotlight, or:"
-	@echo "  open $(HOME)/Applications/BearBridge.app"
-else
-	@echo "install-app is macOS only"
-	@exit 1
-endif
-
-uninstall-app:
-ifeq ($(shell uname),Darwin)
-	@echo "Removing BearBridge.app..."
-	rm -rf $(HOME)/Applications/BearBridge.app
-	@echo "BearBridge.app removed from $(HOME)/Applications/"
-else
-	@echo "uninstall-app is macOS only"
-	@exit 1
-endif
-
-verify-bridge:
-ifeq ($(shell uname),Darwin)
-	@echo "Verifying bear-bridge signature..."
-	codesign --verify --deep --strict --verbose=2 $(BRIDGE_BIN_DIR)/$(BINARY_BRIDGE)
-	@echo ""
-	@echo "Verifying bear-xcall.app signature..."
-	codesign --verify --deep --strict --verbose=2 $(BRIDGE_BIN_DIR)/bear-xcall.app
-	@echo ""
-	@if [ -d "$(HOME)/Applications/BearBridge.app" ]; then \
-		echo "Verifying BearBridge.app signature..."; \
-		codesign --verify --deep --strict --verbose=2 "$(HOME)/Applications/BearBridge.app"; \
-		echo ""; \
-	fi
-	@echo "All signatures valid."
-else
-	@echo "verify-bridge is macOS only"
-	@exit 1
-endif

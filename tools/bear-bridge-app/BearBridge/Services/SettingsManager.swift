@@ -32,8 +32,7 @@ protocol LoginItemManager {
     func setEnabled(_ enabled: Bool) throws
 }
 
-/// Real implementation using SMAppService (macOS 13+).
-@available(macOS 13.0, *)
+/// Real implementation using SMAppService.
 struct SystemLoginItemManager: LoginItemManager {
     var isEnabled: Bool {
         SMAppService.mainApp.status == .enabled
@@ -95,7 +94,7 @@ final class SettingsManager: ObservableObject {
     /// - Parameters:
     ///   - store: Settings store (defaults to UserDefaults.standard).
     ///   - keychain: Keychain service (defaults to real Keychain).
-    ///   - loginItemManager: Login item manager (defaults to SMAppService on macOS 13+).
+    ///   - loginItemManager: Login item manager (defaults to SMAppService).
     init(
         store: SettingsStore? = nil,
         keychain: KeychainServiceProtocol? = nil,
@@ -113,14 +112,7 @@ final class SettingsManager: ObservableObject {
 
         self.store = resolvedStore
         self.keychain = resolvedKeychain
-
-        if let loginItemManager {
-            self.loginItemManager = loginItemManager
-        } else if #available(macOS 13.0, *) {
-            self.loginItemManager = SystemLoginItemManager()
-        } else {
-            self.loginItemManager = nil
-        }
+        self.loginItemManager = loginItemManager ?? SystemLoginItemManager()
 
         // Suppress didSet side effects during init
         self.suppressLaunchAtLoginDidSet = true

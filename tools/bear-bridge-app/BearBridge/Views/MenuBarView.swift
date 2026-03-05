@@ -51,11 +51,29 @@ struct MenuBarView: View {
             VStack(spacing: 0) {
                 syncNowButton
                 ActionButton(title: "View Logs...", systemImage: "doc.text") {
+                    activateApp()
                     openWindow(id: "log-viewer")
+                    DispatchQueue.main.async {
+                        for window in NSApp.windows where window.title.contains("Logs") {
+                            window.makeKeyAndOrderFront(nil)
+                            window.orderFrontRegardless()
+                            break
+                        }
+                    }
                 }
-                ActionButton(title: "Settings...", systemImage: "gear") {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                SettingsLink {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gear")
+                            .frame(width: 16)
+                            .foregroundColor(.secondary)
+                        Text("Settings...")
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
             }
             .padding(.vertical, 4)
 
@@ -82,6 +100,10 @@ struct MenuBarView: View {
         }
         .padding(.vertical, 4)
         .frame(width: 280)
+    }
+
+    private func activateApp() {
+        NSApp.activate()
     }
 
     // MARK: - Subviews
