@@ -59,14 +59,14 @@
 - [x] Run tests — must pass before next task
 
 ### Task 3: Add structured status output to bridge sync
-- [ ] Emit structured JSON status events to stdout during sync:
+- [x] Emit structured JSON status events to stdout during sync:
   - `{"event":"sync_start","time":"..."}`
   - `{"event":"sync_progress","phase":"reading_bear|pushing_hub|processing_queue","notes":150}`
   - `{"event":"sync_complete","duration_ms":1200,"notes_synced":5,"tags_synced":2,"queue_items":1}`
   - `{"event":"sync_error","error":"..."}`
-- [ ] Maintain backward compatibility — status events are additional to existing slog output
-- [ ] Write tests for status event emission
-- [ ] Run tests — must pass before next task
+- [x] Maintain backward compatibility — status events are additional to existing slog output
+- [x] Write tests for status event emission
+- [x] Run tests — must pass before next task
 
 ### Task 4: Create SwiftUI menu bar app project
 - [ ] Create `tools/bear-bridge-app/` directory structure:

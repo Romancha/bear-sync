@@ -75,6 +75,7 @@ func (b *Bridge) processQueue(ctx context.Context) error {
 		return nil
 	}
 
+	b.events.Emit(&SyncEvent{Event: "sync_progress", Phase: "processing_queue", Items: len(items)})
 	b.logger.Info("processing write queue", "items", len(items))
 
 	ackItems := make([]models.SyncAckItem, 0, len(items))
@@ -87,6 +88,8 @@ func (b *Bridge) processQueue(ctx context.Context) error {
 	if err := b.hub.AckQueue(ctx, ackItems); err != nil {
 		return fmt.Errorf("ack queue: %w", err)
 	}
+
+	b.cycleQueue = len(ackItems)
 
 	b.logger.Info("queue processing complete",
 		"total", len(ackItems),

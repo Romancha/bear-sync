@@ -31,6 +31,10 @@ type Bridge struct {
 	bearDataDir string // Bear Application Data directory for reading attachment files
 	logger      *slog.Logger
 	sleepFn     func(time.Duration) // injectable sleep for testing
+	events      *EventEmitter       // structured status events (nil = disabled)
+	cycleNotes  int                 // notes synced in current cycle (reset per Run)
+	cycleTags   int                 // tags synced in current cycle (reset per Run)
+	cycleQueue  int                 // queue items processed in current cycle (reset per Run)
 }
 
 // NewBridge creates a new Bridge instance.
@@ -56,7 +60,30 @@ func NewBridge(
 }
 
 // Run executes a single sync cycle: delta export + push + queue processing.
-func (b *Bridge) Run(ctx context.Context) error {
+// Emits structured status events (sync_start, sync_progress, sync_complete/sync_error)
+// when an EventEmitter is configured.
+func (b *Bridge) Run(ctx context.Context) (retErr error) {
+	b.cycleNotes = 0
+	b.cycleTags = 0
+	b.cycleQueue = 0
+	b.events.Emit(&SyncEvent{Event: "sync_start"})
+	start := time.Now()
+
+	defer func() {
+		durationMs := time.Since(start).Milliseconds()
+		if retErr != nil {
+			b.events.Emit(&SyncEvent{Event: "sync_error", Error: retErr.Error()})
+		} else {
+			b.events.Emit(&SyncEvent{
+				Event:       "sync_complete",
+				DurationMs:  durationMs,
+				NotesSynced: b.cycleNotes,
+				TagsSynced:  b.cycleTags,
+				QueueItems:  b.cycleQueue,
+			})
+		}
+	}()
+
 	state, err := loadState(b.statePath)
 	if err != nil {
 		return fmt.Errorf("load state: %w", err)
@@ -166,7 +193,9 @@ func (b *Bridge) initialSync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	b.events.Emit(&SyncEvent{Event: "sync_progress", Phase: "reading_bear", Notes: len(d.noteRows)})
 
+	b.events.Emit(&SyncEvent{Event: "sync_progress", Phase: "pushing_hub", Notes: len(d.noteRows)})
 	if err := b.pushNotesBatched(ctx, d.noteRows); err != nil {
 		return err
 	}
@@ -205,6 +234,9 @@ func (b *Bridge) initialSync(ctx context.Context) error {
 	if err := saveState(b.statePath, state); err != nil {
 		return fmt.Errorf("save initial state: %w", err)
 	}
+
+	b.cycleNotes = len(d.noteRows)
+	b.cycleTags = len(d.tagRows)
 
 	b.logger.Info("initial sync complete",
 		"notes", len(d.noteRows),
@@ -251,6 +283,7 @@ func (b *Bridge) deltaSync(ctx context.Context, state *BridgeState) error {
 	if err != nil {
 		return fmt.Errorf("build delta push: %w", err)
 	}
+	b.events.Emit(&SyncEvent{Event: "sync_progress", Phase: "reading_bear", Notes: len(req.Notes)})
 
 	if isEmptyPush(req) {
 		b.logger.Info("no changes detected")
@@ -269,6 +302,7 @@ func (b *Bridge) deltaSync(ctx context.Context, state *BridgeState) error {
 	}
 	req.Meta["last_sync_at"] = time.Now().UTC().Format(time.RFC3339)
 
+	b.events.Emit(&SyncEvent{Event: "sync_progress", Phase: "pushing_hub", Notes: len(req.Notes)})
 	if err := b.hub.SyncPush(ctx, *req); err != nil {
 		return fmt.Errorf("push delta: %w", err)
 	}
@@ -290,6 +324,9 @@ func (b *Bridge) deltaSync(ctx context.Context, state *BridgeState) error {
 	if err := saveState(b.statePath, state); err != nil {
 		return fmt.Errorf("save state after delta: %w", err)
 	}
+
+	b.cycleNotes = len(req.Notes)
+	b.cycleTags = len(req.Tags)
 
 	b.logger.Info("delta sync complete",
 		"notes", len(req.Notes),

@@ -155,6 +155,7 @@ func run(logger *slog.Logger, daemonMode bool) error {
 	bridge := NewBridge(db, hub, xcall, cfg.bearToken, cfg.statePath, cfg.bearDBDir, logger)
 
 	if daemonMode {
+		bridge.events = NewEventEmitter(os.Stdout)
 		logger.Info("entering daemon mode", "sync_interval", cfg.syncInterval, "ipc_socket", cfg.ipcSocket)
 		return runDaemonWithIPC(ctx, bridge, cfg.syncInterval, cfg.ipcSocket, logger)
 	}
