@@ -839,18 +839,34 @@ func upsertNote(ctx context.Context, tx *sql.Tx, note *models.Note) error {
 	var existingID string
 	var existingSyncStatus string
 	var existingModifiedAt string
+	var existingTitle, existingBody string
+	var pendingBearTitle, pendingBearBody sql.NullString
 
 	if note.BearID != nil && *note.BearID != "" {
 		err := tx.QueryRowContext(ctx,
-			"SELECT id, sync_status, COALESCE(modified_at, '') FROM notes WHERE bear_id = ?", *note.BearID,
-		).Scan(&existingID, &existingSyncStatus, &existingModifiedAt)
+			`SELECT id, sync_status, COALESCE(modified_at, ''),
+				COALESCE(title, ''), COALESCE(body, ''),
+				pending_bear_title, pending_bear_body
+			FROM notes WHERE bear_id = ?`, *note.BearID,
+		).Scan(&existingID, &existingSyncStatus, &existingModifiedAt,
+			&existingTitle, &existingBody,
+			&pendingBearTitle, &pendingBearBody)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("lookup note by bear_id: %w", err)
 		}
 	}
 
 	if existingID != "" {
-		return updateExistingNote(ctx, tx, note, existingID, existingSyncStatus, existingModifiedAt)
+		var pbt, pbb *string
+		if pendingBearTitle.Valid {
+			pbt = &pendingBearTitle.String
+		}
+		if pendingBearBody.Valid {
+			pbb = &pendingBearBody.String
+		}
+
+		return updateExistingNote(ctx, tx, note, existingID, existingSyncStatus, existingModifiedAt,
+			existingTitle, existingBody, pbt, pbb)
 	}
 
 	return insertNewNote(ctx, tx, note)
@@ -859,13 +875,12 @@ func upsertNote(ctx context.Context, tx *sql.Tx, note *models.Note) error {
 func updateExistingNote(
 	ctx context.Context, tx *sql.Tx, note *models.Note,
 	existingID, existingSyncStatus, existingModifiedAt string,
+	hubTitle, hubBody string, pendingBearTitle, pendingBearBody *string,
 ) error {
 	if existingSyncStatus == syncStatusPendingToBear {
-		// Conflict detection: if Bear's modified_at changed since our last sync,
-		// the user edited the note while a consumer had pending changes.
 		newSyncStatus := syncStatusPendingToBear
 		if note.ModifiedAt != "" && existingModifiedAt != "" && note.ModifiedAt != existingModifiedAt {
-			newSyncStatus = syncStatusConflict
+			newSyncStatus = detectContentConflict(note, hubTitle, hubBody, pendingBearTitle, pendingBearBody)
 		}
 
 		query := `UPDATE notes SET
@@ -930,6 +945,28 @@ func updateExistingNote(
 	}
 
 	return nil
+}
+
+// detectContentConflict determines whether a Bear delta push conflicts with pending consumer changes.
+// If pending_bear fields are nil (create flow), falls back to timestamp-based conflict.
+// Otherwise, conflict fires only if Bear changed a content field that the consumer also changed.
+func detectContentConflict(
+	bearDelta *models.Note, hubTitle, hubBody string, pendingBearTitle, pendingBearBody *string,
+) string {
+	if pendingBearTitle == nil || pendingBearBody == nil {
+		return syncStatusConflict
+	}
+
+	bearTitleChanged := bearDelta.Title != *pendingBearTitle
+	bearBodyChanged := bearDelta.Body != *pendingBearBody
+	consumerChangedTitle := hubTitle != *pendingBearTitle
+	consumerChangedBody := hubBody != *pendingBearBody
+
+	if (bearTitleChanged && consumerChangedTitle) || (bearBodyChanged && consumerChangedBody) {
+		return syncStatusConflict
+	}
+
+	return syncStatusPendingToBear
 }
 
 func insertNewNote(ctx context.Context, tx *sql.Tx, note *models.Note) error {

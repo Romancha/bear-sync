@@ -69,15 +69,15 @@ Replace timestamp-only conflict detection with field-level content comparison. C
 
 ### Task 4: Field-level conflict detection in updateExistingNote()
 
-- [ ] Write test: Bear delta with changed `modified_at` but same title/body as pending_bear → NO conflict (metadata drift)
-- [ ] Write test: Bear delta with changed `modified_at` AND changed body (body differs from pending_bear_body), consumer also changed body → CONFLICT
-- [ ] Write test: Bear delta with changed `modified_at` AND changed title, but consumer only changed body → NO conflict (no field intersection)
-- [ ] Write test: Bear delta with changed `modified_at` AND changed both title and body, consumer changed body → CONFLICT (body intersects)
-- [ ] Write test: pending_bear fields are NULL/empty (create flow) — fallback to current behavior (timestamp-based conflict)
-- [ ] Update `upsertNote()` SELECT to also fetch `pending_bear_title`, `pending_bear_body`, `title`, `body`
-- [ ] Update `updateExistingNote()` signature to accept the new fields
-- [ ] Implement field-level comparison logic: conflict only if Bear changed a content field AND consumer's write queue also targets that field
-- [ ] Run tests — must pass before next task
+- [x] Write test: Bear delta with changed `modified_at` but same title/body as pending_bear → NO conflict (metadata drift)
+- [x] Write test: Bear delta with changed `modified_at` AND changed body (body differs from pending_bear_body), consumer also changed body → CONFLICT
+- [x] Write test: Bear delta with changed `modified_at` AND changed title, but consumer only changed body → NO conflict (no field intersection)
+- [x] Write test: Bear delta with changed `modified_at` AND changed both title and body, consumer changed body → CONFLICT (body intersects)
+- [x] Write test: pending_bear fields are NULL/empty (create flow) — fallback to current behavior (timestamp-based conflict)
+- [x] Update `upsertNote()` SELECT to also fetch `pending_bear_title`, `pending_bear_body`, `title`, `body`
+- [x] Update `updateExistingNote()` signature to accept the new fields
+- [x] Implement field-level comparison logic: conflict only if Bear changed a content field AND consumer's write queue also targets that field
+- [x] Run tests — must pass before next task
 
 ### Task 5: Handle other write actions (trash, archive, add_tag)
 

@@ -1194,6 +1194,108 @@ func TestProcessSyncPush_NoConflictOnSameModifiedAt(t *testing.T) {
 	assert.Equal(t, "Consumer Title", got.Title, "title should be preserved")
 }
 
+func TestProcessSyncPush_FieldLevelConflict(t *testing.T) {
+	tests := []struct {
+		name             string
+		hubTitle         string
+		hubBody          string
+		pendingBearTitle *string
+		pendingBearBody  *string
+		bearTitle        string
+		bearBody         string
+		wantSyncStatus   string
+	}{
+		{
+			name:             "metadata drift only - no conflict",
+			hubTitle:         "Consumer Title",
+			hubBody:          "Consumer Body",
+			pendingBearTitle: strPtr("Bear Title"),
+			pendingBearBody:  strPtr("Bear Body"),
+			bearTitle:        "Bear Title",
+			bearBody:         "Bear Body",
+			wantSyncStatus:   "pending_to_bear",
+		},
+		{
+			name:             "both Bear and consumer changed body - conflict",
+			hubTitle:         "Same Title",
+			hubBody:          "Consumer Body",
+			pendingBearTitle: strPtr("Same Title"),
+			pendingBearBody:  strPtr("Original Body"),
+			bearTitle:        "Same Title",
+			bearBody:         "Bear Changed Body",
+			wantSyncStatus:   "conflict",
+		},
+		{
+			name:             "Bear changed title, consumer changed body - no field intersection",
+			hubTitle:         "Same Title",
+			hubBody:          "Consumer Body",
+			pendingBearTitle: strPtr("Same Title"),
+			pendingBearBody:  strPtr("Original Body"),
+			bearTitle:        "Bear Changed Title",
+			bearBody:         "Original Body",
+			wantSyncStatus:   "pending_to_bear",
+		},
+		{
+			name:             "Bear changed both, consumer changed body - body intersects",
+			hubTitle:         "Same Title",
+			hubBody:          "Consumer Body",
+			pendingBearTitle: strPtr("Same Title"),
+			pendingBearBody:  strPtr("Original Body"),
+			bearTitle:        "Bear Changed Title",
+			bearBody:         "Bear Changed Body",
+			wantSyncStatus:   "conflict",
+		},
+		{
+			name:             "NULL pending_bear fields - fallback to timestamp conflict",
+			hubTitle:         "Consumer Title",
+			hubBody:          "Consumer Body",
+			pendingBearTitle: nil,
+			pendingBearBody:  nil,
+			bearTitle:        "Bear Title",
+			bearBody:         "Bear Body",
+			wantSyncStatus:   "conflict",
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestStore(t)
+			ctx := context.Background()
+
+			bearID := fmt.Sprintf("bear-field-%d", i)
+			require.NoError(t, s.CreateNote(ctx, &models.Note{
+				ID:               "n1",
+				BearID:           &bearID,
+				Title:            tt.hubTitle,
+				Body:             tt.hubBody,
+				SyncStatus:       "pending_to_bear",
+				ModifiedAt:       "2025-01-01T10:00:00Z",
+				PendingBearTitle: tt.pendingBearTitle,
+				PendingBearBody:  tt.pendingBearBody,
+			}))
+
+			req := models.SyncPushRequest{
+				Notes: []models.Note{
+					{
+						BearID:     &bearID,
+						Title:      tt.bearTitle,
+						Body:       tt.bearBody,
+						ModifiedAt: "2025-01-01T11:00:00Z",
+						SyncStatus: "synced",
+					},
+				},
+			}
+			require.NoError(t, s.ProcessSyncPush(ctx, req))
+
+			got, err := s.GetNote(ctx, "n1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSyncStatus, got.SyncStatus)
+			assert.Equal(t, tt.hubTitle, got.Title, "consumer title preserved")
+			assert.Equal(t, tt.hubBody, got.Body, "consumer body preserved")
+		})
+	}
+}
+
 func TestCountConflicts(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
