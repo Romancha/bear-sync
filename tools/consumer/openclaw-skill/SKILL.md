@@ -9,6 +9,8 @@ metadata: {"openclaw":{"emoji":"🐟","requires":{"bins":["curl","jq"],"env":["S
 
 Interact with Bear notes through the Salmon Hub API. Bear is the source of truth — writes go through an async queue and are applied to Bear by the bridge agent.
 
+Bear notes use Markdown format. When creating or updating notes, always write the `body` field in Markdown. Bear supports headings (`#`, `##`), lists (`-`, `1.`), checkboxes (`- [ ]`, `- [x]`), bold (`**bold**`), italic (`*italic*`), code blocks, links, and inline tags (`#tag`, `#tag/subtag`). The `title` field is plain text — do not use Markdown in it.
+
 All responses are JSON. Pipe through `jq` for readability.
 
 ## Interactive API docs
@@ -170,6 +172,8 @@ Fields:
 - `title` (required) — note title
 - `body` (optional) — Markdown content
 - `tags` (optional) — array of tag names
+
+IMPORTANT: Do NOT put `#tag` inline in the `body` if you also pass those tags in the `tags` array. Bear adds tags from the `tags` parameter automatically — duplicating them in the body will result in double tags in the note.
 
 Returns HTTP 201. The note will have `sync_status: pending_to_bear` until the bridge syncs it to Bear.
 
