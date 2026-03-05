@@ -1687,4 +1687,93 @@ func TestSyncStatus_WithConflicts(t *testing.T) {
 	assert.Equal(t, "n1", conflictIDs[0])
 }
 
+func TestTrashNote_SetsPendingBearFields(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-trash-pb"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-trash-pb", Title: "My Title", Body: "My Body", BearID: &bearID,
+	}))
+
+	resp := doRequest(t, ts, http.MethodDelete, "/api/notes/note-trash-pb", nil, consumerToken,
+		map[string]string{"Idempotency-Key": "key-trash-pb"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	note, err := s.GetNote(t.Context(), "note-trash-pb")
+	require.NoError(t, err)
+	assert.Equal(t, "pending_to_bear", note.SyncStatus)
+	require.NotNil(t, note.PendingBearTitle, "pending_bear_title should be set after trash")
+	require.NotNil(t, note.PendingBearBody, "pending_bear_body should be set after trash")
+	assert.Equal(t, "My Title", *note.PendingBearTitle)
+	assert.Equal(t, "My Body", *note.PendingBearBody)
+	// Title/body should be unchanged (trash doesn't modify content).
+	assert.Equal(t, "My Title", note.Title)
+	assert.Equal(t, "My Body", note.Body)
+}
+
+func TestArchiveNote_SetsPendingBearFields(t *testing.T) {
+	ts, s := setupServer(t)
+
+	bearID := "bear-arch-pb"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-arch-pb", Title: "Arch Title", Body: "Arch Body", BearID: &bearID,
+	}))
+
+	resp := doRequest(t, ts, http.MethodPost, "/api/notes/note-arch-pb/archive", nil, consumerToken,
+		map[string]string{"Idempotency-Key": "key-arch-pb"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	note, err := s.GetNote(t.Context(), "note-arch-pb")
+	require.NoError(t, err)
+	assert.Equal(t, "pending_to_bear", note.SyncStatus)
+	require.NotNil(t, note.PendingBearTitle, "pending_bear_title should be set after archive")
+	require.NotNil(t, note.PendingBearBody, "pending_bear_body should be set after archive")
+	assert.Equal(t, "Arch Title", *note.PendingBearTitle)
+	assert.Equal(t, "Arch Body", *note.PendingBearBody)
+}
+
+func TestTrashNote_NoConflictOnBearBodyChange(t *testing.T) {
+	// Trash doesn't modify title/body, so even if Bear changes body,
+	// field-level conflict detection should NOT fire (no field intersection).
+	_, s := setupServer(t)
+	ctx := t.Context()
+
+	bearID := "bear-trash-noconflict"
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:               "n1",
+		BearID:           &bearID,
+		Title:            "Original Title",
+		Body:             "Original Body",
+		SyncStatus:       "pending_to_bear",
+		ModifiedAt:       "2025-01-01T10:00:00Z",
+		PendingBearTitle: strPtr("Original Title"),
+		PendingBearBody:  strPtr("Original Body"),
+		Trashed:          1,
+	}))
+
+	// Bear pushes with changed body and different modified_at.
+	req := models.SyncPushRequest{
+		Notes: []models.Note{
+			{
+				BearID:     &bearID,
+				Title:      "Original Title",
+				Body:       "Bear Changed Body",
+				ModifiedAt: "2025-01-01T11:00:00Z",
+				SyncStatus: "synced",
+			},
+		},
+	}
+	require.NoError(t, s.ProcessSyncPush(ctx, req))
+
+	got, err := s.GetNote(ctx, "n1")
+	require.NoError(t, err)
+	// No conflict because consumer (trash) didn't change title or body.
+	// hub title/body == pending_bear title/body → no consumer content change.
+	assert.Equal(t, "pending_to_bear", got.SyncStatus, "trash action should not conflict on Bear body change")
+}
+
 func strPtr(s string) *string { return &s }

@@ -81,10 +81,10 @@ Replace timestamp-only conflict detection with field-level content comparison. C
 
 ### Task 5: Handle other write actions (trash, archive, add_tag)
 
-- [ ] Write test: trash action on a note where Bear changed body → NO conflict (trash doesn't modify title/body)
-- [ ] In `trashNote()`, `archiveNote()`, `addTag()` handlers: set `pending_bear_title`/`pending_bear_body` when transitioning to pending_to_bear
-- [ ] These actions don't change title/body, so field-level check should never conflict on content (only on metadata, which we now ignore)
-- [ ] Run tests — must pass before next task
+- [x] Write test: trash action on a note where Bear changed body → NO conflict (trash doesn't modify title/body)
+- [x] In `trashNote()`, `archiveNote()`, `addTag()` handlers: set `pending_bear_title`/`pending_bear_body` when transitioning to pending_to_bear
+- [x] These actions don't change title/body, so field-level check should never conflict on content (only on metadata, which we now ignore)
+- [x] Run tests — must pass before next task
 
 ### Task 6: Update existing conflict tests
 

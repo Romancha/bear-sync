@@ -499,6 +499,16 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 	oldTrashedAt := note.TrashedAt
 	oldSyncStatus := note.SyncStatus
 	oldHubModifiedAt := note.HubModifiedAt
+	oldPendingBearTitle := note.PendingBearTitle
+	oldPendingBearBody := note.PendingBearBody
+
+	// Snapshot Bear's current title/body for field-level conflict detection.
+	// Trash doesn't modify content, so hub title/body will equal pending_bear values,
+	// preventing false conflicts when Bear changes content concurrently.
+	bearTitle := note.Title
+	bearBody := note.Body
+	note.PendingBearTitle = &bearTitle
+	note.PendingBearBody = &bearBody
 
 	note.Trashed = 1
 	note.TrashedAt = now
@@ -525,6 +535,8 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 		note.TrashedAt = oldTrashedAt
 		note.SyncStatus = oldSyncStatus
 		note.HubModifiedAt = oldHubModifiedAt
+		note.PendingBearTitle = oldPendingBearTitle
+		note.PendingBearBody = oldPendingBearBody
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
 			logNoteRestoreError(note.ID, err, restoreErr)
 		}
@@ -597,6 +609,14 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 	oldArchivedAt := note.ArchivedAt
 	oldSyncStatus := note.SyncStatus
 	oldHubModifiedAt := note.HubModifiedAt
+	oldPendingBearTitle := note.PendingBearTitle
+	oldPendingBearBody := note.PendingBearBody
+
+	// Snapshot Bear's current title/body for field-level conflict detection.
+	bearTitle := note.Title
+	bearBody := note.Body
+	note.PendingBearTitle = &bearTitle
+	note.PendingBearBody = &bearBody
 
 	note.Archived = 1
 	note.ArchivedAt = now
@@ -619,6 +639,8 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 		note.ArchivedAt = oldArchivedAt
 		note.SyncStatus = oldSyncStatus
 		note.HubModifiedAt = oldHubModifiedAt
+		note.PendingBearTitle = oldPendingBearTitle
+		note.PendingBearBody = oldPendingBearBody
 		if restoreErr := s.store.UpdateNote(r.Context(), note); restoreErr != nil {
 			logNoteRestoreError(note.ID, err, restoreErr)
 		}
