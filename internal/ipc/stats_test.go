@@ -40,6 +40,15 @@ func TestStatsTracker_SetError(t *testing.T) {
 	assert.Equal(t, "connection failed", status.LastError)
 }
 
+func TestStatsTracker_SetIdle_ClearsLastError(t *testing.T) {
+	st := NewStatsTracker(0)
+	st.SetError("connection failed")
+	st.SetIdle()
+	status := st.GetStatus()
+	assert.Equal(t, "idle", status.State)
+	assert.Empty(t, status.LastError)
+}
+
 func TestStatsTracker_RecordSync(t *testing.T) {
 	st := NewStatsTracker(0)
 

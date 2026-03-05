@@ -110,6 +110,7 @@ func (st *StatsTracker) SetIdle() {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.state = "idle"
+	st.lastError = ""
 	st.lastSync = time.Now()
 }
 
