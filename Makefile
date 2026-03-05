@@ -53,7 +53,11 @@ IS_RELEASE_ARCHIVE = 1
 endif
 
 # Default target
+ifneq ($(wildcard go.mod),)
 all: test build
+else
+all: install-bridge
+endif
 
 # Help
 help:
@@ -178,7 +182,7 @@ endif
 	cp $(BRIDGE_SRC_BIN) $(BRIDGE_BIN_DIR)/
 	cp -R $(XCALL_SRC_APP) $(BRIDGE_BIN_DIR)/
 ifeq ($(IS_RELEASE_ARCHIVE),0)
-	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements tools/bear-xcall/entitlements.plist --options runtime $(BRIDGE_BIN_DIR)/bear-xcall.app
+	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements $(ENTITLEMENTS_SRC) --options runtime $(BRIDGE_BIN_DIR)/bear-xcall.app
 endif
 	cp $(WRAPPER_SRC) $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh
 	chmod +x $(BRIDGE_BIN_DIR)/bear-bridge-wrapper.sh

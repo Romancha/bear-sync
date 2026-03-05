@@ -48,7 +48,8 @@ jobs:
         env:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
-        run: go build -ldflags "-X main.version=${{ steps.version.outputs.version }}" -o bin/bear-bridge ./cmd/bridge
+          BUILD_VERSION: ${{ steps.version.outputs.version }}
+        run: go build -ldflags "-X main.version=$BUILD_VERSION" -o bin/bear-bridge ./cmd/bridge
 
       - name: Build bear-xcall.app
         run: |
@@ -148,10 +149,12 @@ jobs:
           codesign --verify --deep --strict --verbose=2 bin/bear-xcall.app
 
       - name: Create release archive
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH_NAME: ${{ matrix.arch_name }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          ARCHIVE_NAME="bear-bridge-${VERSION}-darwin-${{ matrix.arch_name }}.tar.gz"
-          ARCHIVE_DIR="bear-bridge-${VERSION}-darwin-${{ matrix.arch_name }}"
+          ARCHIVE_NAME="bear-bridge-${VERSION}-darwin-${ARCH_NAME}.tar.gz"
+          ARCHIVE_DIR="bear-bridge-${VERSION}-darwin-${ARCH_NAME}"
           mkdir -p "${ARCHIVE_DIR}"
           cp bin/bear-bridge "${ARCHIVE_DIR}/"
           cp -R bin/bear-xcall.app "${ARCHIVE_DIR}/"
