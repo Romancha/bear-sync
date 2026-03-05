@@ -80,7 +80,7 @@ All mutating consumer endpoints require an `Idempotency-Key` header. Encrypted n
 
 ## Prerequisites
 
-- Go 1.24+
+- Go 1.26+
 - Xcode Command Line Tools (for building bear-xcall on macOS; provides `swiftc`)
 - Bear.app (for bridge)
 - bear-xcall CLI (built via `make build-xcall`, for bridge write operations; source in `tools/bear-xcall/`)
