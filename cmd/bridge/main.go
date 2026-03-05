@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/romancha/bear-sync/internal/beardb"
 	"github.com/romancha/bear-sync/internal/hubclient"
@@ -17,26 +19,36 @@ import (
 var version = "dev"
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		fmt.Println("bear-bridge " + version)
-		return
+	daemonMode := false
+	for _, arg := range os.Args[1:] {
+		switch arg {
+		case "--version":
+			fmt.Println("bear-bridge " + version)
+			return
+		case "--daemon":
+			daemonMode = true
+		}
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	if err := run(logger); err != nil {
+	if err := run(logger, daemonMode); err != nil {
 		logger.Error("bridge failed", "error", err)
 		os.Exit(1)
 	}
 }
 
+// defaultSyncInterval is the default interval between sync cycles in daemon mode.
+const defaultSyncInterval = 300 * time.Second
+
 type config struct {
-	hubURL    string
-	hubToken  string
-	bearToken string
-	statePath string
-	bearDBDir string
+	hubURL       string
+	hubToken     string
+	bearToken    string
+	statePath    string
+	bearDBDir    string
+	syncInterval time.Duration
 }
 
 func loadConfig() (*config, error) {
@@ -76,10 +88,19 @@ func loadConfig() (*config, error) {
 		cfg.bearDBDir = home + "/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data"
 	}
 
+	cfg.syncInterval = defaultSyncInterval
+	if v := os.Getenv("BRIDGE_SYNC_INTERVAL"); v != "" {
+		secs, err := strconv.Atoi(v)
+		if err != nil || secs < 1 {
+			return nil, fmt.Errorf("BRIDGE_SYNC_INTERVAL must be a positive integer (seconds), got %q", v)
+		}
+		cfg.syncInterval = time.Duration(secs) * time.Second
+	}
+
 	return cfg, nil
 }
 
-func run(logger *slog.Logger) error {
+func run(logger *slog.Logger, daemonMode bool) error {
 	cfg, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -96,7 +117,8 @@ func run(logger *slog.Logger) error {
 	logger.Info("bridge starting",
 		"hub_url", cfg.hubURL,
 		"state_path", cfg.statePath,
-		"bear_db_dir", cfg.bearDBDir)
+		"bear_db_dir", cfg.bearDBDir,
+		"daemon", daemonMode)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
@@ -120,6 +142,11 @@ func run(logger *slog.Logger) error {
 	}
 
 	bridge := NewBridge(db, hub, xcall, cfg.bearToken, cfg.statePath, cfg.bearDBDir, logger)
+
+	if daemonMode {
+		logger.Info("entering daemon mode", "sync_interval", cfg.syncInterval)
+		return runDaemon(ctx, bridge, cfg.syncInterval, logger)
+	}
 
 	if err := bridge.Run(ctx); err != nil {
 		return fmt.Errorf("sync: %w", err)

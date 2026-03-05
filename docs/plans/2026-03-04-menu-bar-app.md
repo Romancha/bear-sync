@@ -37,12 +37,12 @@
 ## Implementation Steps
 
 ### Task 1: Add daemon mode to bear-bridge
-- [ ] Add `--daemon` flag to `cmd/bridge/main.go` — runs sync loop continuously instead of one-shot
-- [ ] Add configurable sync interval via `BRIDGE_SYNC_INTERVAL` env (default 300s, matching current launchd)
-- [ ] Implement graceful shutdown in daemon mode (SIGTERM/SIGINT stops loop)
-- [ ] Ensure one-shot mode (no `--daemon`) still works identically for backward compatibility
-- [ ] Write tests for daemon loop start/stop, interval timing, signal handling
-- [ ] Run tests — must pass before next task
+- [x] Add `--daemon` flag to `cmd/bridge/main.go` — runs sync loop continuously instead of one-shot
+- [x] Add configurable sync interval via `BRIDGE_SYNC_INTERVAL` env (default 300s, matching current launchd)
+- [x] Implement graceful shutdown in daemon mode (SIGTERM/SIGINT stops loop)
+- [x] Ensure one-shot mode (no `--daemon`) still works identically for backward compatibility
+- [x] Write tests for daemon loop start/stop, interval timing, signal handling
+- [x] Run tests — must pass before next task
 
 ### Task 2: Add Unix socket IPC to bridge daemon
 - [ ] Create `internal/ipc/` package with Unix socket server
