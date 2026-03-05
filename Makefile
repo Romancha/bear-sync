@@ -1,7 +1,7 @@
 .PHONY: build build-xcall build-app test test-coverage test-race test-xcall test-app lint fmt tidy clean generate tools swagger help all dmg
 
-BINARY_HUB=bear-sync-hub
-BINARY_BRIDGE=bear-bridge
+BINARY_HUB=salmon-hub
+BINARY_BRIDGE=salmon-run
 
 # Version for ldflags injection (default: dev, override with make build VERSION=v1.0.0)
 VERSION ?= dev
@@ -34,15 +34,15 @@ help:
 	@echo "  Build:"
 	@echo "    make build          - Build all binaries to bin/ (includes bear-xcall on macOS)"
 	@echo "    make build-xcall    - Build bear-xcall Swift CLI .app bundle (macOS only)"
-	@echo "    make build-app      - Build BearBridge menu bar .app bundle (macOS only)"
-	@echo "    make dmg            - Create BearBridge .dmg disk image (macOS only)"
+	@echo "    make build-app      - Build SalmonRun menu bar .app bundle (macOS only)"
+	@echo "    make dmg            - Create SalmonRun .dmg disk image (macOS only)"
 	@echo ""
 	@echo "  Test:"
 	@echo "    make test           - Run all Go tests"
 	@echo "    make test-coverage  - Run tests with coverage report"
 	@echo "    make test-race      - Run tests with race detector"
 	@echo "    make test-xcall     - Run bear-xcall manual tests (macOS + Bear)"
-	@echo "    make test-app       - Run BearBridge Swift tests (macOS only)"
+	@echo "    make test-app       - Run SalmonRun Swift tests (macOS only)"
 	@echo ""
 	@echo "  Tools:"
 	@echo "    make lint           - Run golangci-lint"
@@ -80,10 +80,10 @@ ifeq ($(shell uname),Darwin)
 	@mkdir -p bin/BearBridge.app/Contents/MacOS
 	cp -R bin/xcodebuild-out/BearBridge.app/ bin/BearBridge.app/
 	rm -rf bin/xcodebuild-out
-	cp bin/bear-bridge bin/BearBridge.app/Contents/MacOS/
+	cp bin/$(BINARY_BRIDGE) bin/BearBridge.app/Contents/MacOS/$(BINARY_BRIDGE)
 	cp -R bin/bear-xcall.app bin/BearBridge.app/Contents/MacOS/
 	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements $(ENTITLEMENTS_SRC) --options runtime bin/BearBridge.app/Contents/MacOS/bear-xcall.app
-	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/BearBridge.app/Contents/MacOS/bear-bridge
+	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/BearBridge.app/Contents/MacOS/$(BINARY_BRIDGE)
 	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/BearBridge.app
 else
 	@echo "Skipping BearBridge.app build (macOS only)"

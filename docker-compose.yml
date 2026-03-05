@@ -1,7 +1,7 @@
 services:
   hub:
     build: .
-    image: ghcr.io/romancha/bear-sync-hub:latest
+    image: ghcr.io/romancha/salmon-hub:latest
     restart: unless-stopped
     environment:
       SALMON_HUB_HOST: "0.0.0.0"

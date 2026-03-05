@@ -58,13 +58,13 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Run `make test` - must pass before next task
 
 ### Task 3: Rename binary names in Makefile and build system
-- [ ] In `Makefile`: `BINARY_HUB=bear-sync-hub` -> `BINARY_HUB=salmon-hub`
-- [ ] In `Makefile`: `BINARY_BRIDGE=bear-bridge` -> `BINARY_BRIDGE=salmon-run`
-- [ ] Update all help text and echo statements in Makefile
-- [ ] Update `Dockerfile`: binary name references `bear-sync-hub` -> `salmon-hub`
-- [ ] Update `docker-compose.yml`: image name `bear-sync-hub` -> `salmon-hub`
-- [ ] Run `make build` to verify binaries build correctly
-- [ ] Run `make test` - must pass before next task
+- [x] In `Makefile`: `BINARY_HUB=bear-sync-hub` -> `BINARY_HUB=salmon-hub`
+- [x] In `Makefile`: `BINARY_BRIDGE=bear-bridge` -> `BINARY_BRIDGE=salmon-run`
+- [x] Update all help text and echo statements in Makefile
+- [x] Update `Dockerfile`: binary name references `bear-sync-hub` -> `salmon-hub`
+- [x] Update `docker-compose.yml`: image name `bear-sync-hub` -> `salmon-hub`
+- [x] Run `make build` to verify binaries build correctly
+- [x] Run `make test` - must pass before next task
 
 ### Task 4: Rename deployment configs
 - [ ] Rename file `deploy/bear-sync-hub.service` -> `deploy/salmon-hub.service`
