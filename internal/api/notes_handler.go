@@ -377,12 +377,7 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 	oldPendingBearTitle := note.PendingBearTitle
 	oldPendingBearBody := note.PendingBearBody
 
-	// Snapshot Bear's current title/body before consumer overwrites them.
-	// Used by field-level conflict detection in ProcessSyncPush.
-	bearTitle := note.Title
-	bearBody := note.Body
-	note.PendingBearTitle = &bearTitle
-	note.PendingBearBody = &bearBody
+	snapshotPendingBear(note)
 
 	if req.Title != "" {
 		note.Title = req.Title
@@ -502,13 +497,7 @@ func (s *Server) trashNote(w http.ResponseWriter, r *http.Request) {
 	oldPendingBearTitle := note.PendingBearTitle
 	oldPendingBearBody := note.PendingBearBody
 
-	// Snapshot Bear's current title/body for field-level conflict detection.
-	// Trash doesn't modify content, so hub title/body will equal pending_bear values,
-	// preventing false conflicts when Bear changes content concurrently.
-	bearTitle := note.Title
-	bearBody := note.Body
-	note.PendingBearTitle = &bearTitle
-	note.PendingBearBody = &bearBody
+	snapshotPendingBear(note)
 
 	note.Trashed = 1
 	note.TrashedAt = now
@@ -612,11 +601,7 @@ func (s *Server) archiveNote(w http.ResponseWriter, r *http.Request) {
 	oldPendingBearTitle := note.PendingBearTitle
 	oldPendingBearBody := note.PendingBearBody
 
-	// Snapshot Bear's current title/body for field-level conflict detection.
-	bearTitle := note.Title
-	bearBody := note.Body
-	note.PendingBearTitle = &bearTitle
-	note.PendingBearBody = &bearBody
+	snapshotPendingBear(note)
 
 	note.Archived = 1
 	note.ArchivedAt = now
@@ -815,6 +800,18 @@ func isRetryableQueueItem(item *models.WriteQueueItem, err error) bool {
 }
 
 // logNoteRestoreError logs when a note state rollback fails after an enqueue error.
+// snapshotPendingBear stores Bear's current title/body as the base for field-level conflict detection.
+// Only sets fields on initial transition to pending_to_bear; preserves existing snapshot on consecutive updates.
+func snapshotPendingBear(note *models.Note) {
+	if note.PendingBearTitle != nil {
+		return
+	}
+	bearTitle := note.Title
+	bearBody := note.Body
+	note.PendingBearTitle = &bearTitle
+	note.PendingBearBody = &bearBody
+}
+
 func logNoteRestoreError(noteID string, enqueueErr, restoreErr error) {
 	slog.Error("failed to restore note state after enqueue failure", //nolint:gosec // G706: error strings are internal
 		"note_id", noteID, "enqueue_error", enqueueErr.Error(), "restore_error", restoreErr.Error())

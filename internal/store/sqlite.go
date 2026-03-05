@@ -265,6 +265,37 @@ END;
 		return fmt.Errorf("migrate write_queue consumer_id: %w", err)
 	}
 
+	// Migrate existing notes table: add pending_bear_title/body columns if missing.
+	if err := s.migratePendingBearColumns(ctx); err != nil {
+		return fmt.Errorf("migrate pending_bear columns: %w", err)
+	}
+
+	return nil
+}
+
+// migratePendingBearColumns adds pending_bear_title and pending_bear_body columns to an existing
+// notes table for field-level conflict detection. These columns store Bear's title/body snapshot
+// at enqueue time, so conflict detection can compare per-field instead of using timestamps.
+func (s *SQLiteStore) migratePendingBearColumns(ctx context.Context) error {
+	var ddlSQL sql.NullString
+	if err := s.db.QueryRowContext(ctx,
+		"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'",
+	).Scan(&ddlSQL); err != nil {
+		return fmt.Errorf("read notes DDL: %w", err)
+	}
+
+	if ddlSQL.Valid && strings.Contains(ddlSQL.String, "pending_bear_title") {
+		return nil // columns already exist
+	}
+
+	if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_title TEXT"); err != nil {
+		return fmt.Errorf("add pending_bear_title column: %w", err)
+	}
+
+	if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_body TEXT"); err != nil {
+		return fmt.Errorf("add pending_bear_body column: %w", err)
+	}
+
 	return nil
 }
 

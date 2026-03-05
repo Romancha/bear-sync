@@ -62,12 +62,12 @@ stateDiagram-v2
 
     synced --> pending: consumer enqueues write\n(POST/PUT/DELETE)
     pending --> synced: bridge ACKs applied
-    pending --> conflict: Bear push arrives\nwith newer modified_at
+    pending --> conflict: Bear push arrives\nwith overlapping content change
 
     conflict --> synced: bridge creates [Conflict] note\nand ACKs conflict_resolved=true
 ```
 
-While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`body` on the hub. If Bear modifies the note before the bridge ACKs, the hub detects a conflict and the bridge creates a `[Conflict] Title` note in Bear instead of overwriting.
+While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`body` on the hub. Conflict detection is field-level: the hub snapshots Bear's title/body when transitioning to `pending_to_bear`, and a conflict is raised only if Bear changed a content field (title or body) that the consumer also changed. Metadata-only changes (e.g., opening the note in Bear) do not trigger a conflict. On conflict, the bridge creates a `[Conflict] Title` note in Bear instead of applying the queued write.
 
 ### Write Actions
 

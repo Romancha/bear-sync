@@ -1736,6 +1736,45 @@ func TestArchiveNote_SetsPendingBearFields(t *testing.T) {
 	assert.Equal(t, "Arch Body", *note.PendingBearBody)
 }
 
+func TestUpdateNote_ConsecutiveUpdatePreservesSnapshot(t *testing.T) {
+	// A second consumer update on an already pending_to_bear note must preserve
+	// the original Bear snapshot, not overwrite it with the consumer's values.
+	ts, s := setupServer(t)
+
+	bearID := "bear-consec"
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-consec", Title: "Bear Original", Body: "Bear Original Body", BearID: &bearID,
+	}))
+
+	// First consumer update: sets pending_bear fields to Bear's original values.
+	resp := doRequest(t, ts, http.MethodPut, "/api/notes/note-consec",
+		map[string]string{"title": "Consumer V1", "body": "Consumer Body V1"}, consumerToken,
+		map[string]string{"Idempotency-Key": "key-consec-1"})
+	defer resp.Body.Close() //nolint:errcheck // test
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	note, err := s.GetNote(t.Context(), "note-consec")
+	require.NoError(t, err)
+	assert.Equal(t, "Consumer V1", note.Title)
+	require.NotNil(t, note.PendingBearTitle)
+	assert.Equal(t, "Bear Original", *note.PendingBearTitle)
+	assert.Equal(t, "Bear Original Body", *note.PendingBearBody)
+
+	// Second consumer update: pending_bear fields must still point to Bear's original values.
+	resp2 := doRequest(t, ts, http.MethodPut, "/api/notes/note-consec",
+		map[string]string{"title": "Consumer V2", "body": "Consumer Body V2"}, consumerToken,
+		map[string]string{"Idempotency-Key": "key-consec-2"})
+	defer resp2.Body.Close() //nolint:errcheck // test
+	assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	note2, err := s.GetNote(t.Context(), "note-consec")
+	require.NoError(t, err)
+	assert.Equal(t, "Consumer V2", note2.Title)
+	require.NotNil(t, note2.PendingBearTitle, "pending_bear_title must survive consecutive update")
+	assert.Equal(t, "Bear Original", *note2.PendingBearTitle, "snapshot must be Bear's original, not consumer V1")
+	assert.Equal(t, "Bear Original Body", *note2.PendingBearBody, "snapshot must be Bear's original body")
+}
+
 func TestTrashNote_NoConflictOnBearBodyChange(t *testing.T) {
 	// Trash doesn't modify title/body, so even if Bear changes body,
 	// field-level conflict detection should NOT fire (no field intersection).
