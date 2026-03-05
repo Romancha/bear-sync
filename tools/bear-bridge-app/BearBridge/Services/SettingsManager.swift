@@ -127,7 +127,8 @@ final class SettingsManager: ObservableObject {
 
         // Load saved values
         self.hubURL = resolvedStore.string(forKey: SettingsKey.hubURL) ?? ""
-        self.syncIntervalMinutes = resolvedStore.integer(forKey: SettingsKey.syncIntervalMinutes)
+        let loaded = resolvedStore.integer(forKey: SettingsKey.syncIntervalMinutes)
+        self.syncIntervalMinutes = max(Self.syncIntervalRange.lowerBound, min(Self.syncIntervalRange.upperBound, loaded))
         self.launchAtLogin = resolvedStore.bool(forKey: SettingsKey.launchAtLogin)
         self.notificationsEnabled = resolvedStore.bool(forKey: SettingsKey.notificationsEnabled)
 

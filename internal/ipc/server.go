@@ -185,6 +185,9 @@ const (
 )
 
 func (s *Server) acceptLoop(ctx context.Context) {
+	const maxBackoff = 5 * time.Second
+	backoff := 100 * time.Millisecond
+
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
@@ -192,11 +195,14 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			default:
-				s.logger.Warn("ipc accept error, continuing", "error", err)
+				s.logger.Warn("ipc accept error, retrying", "error", err, "backoff", backoff)
+				time.Sleep(backoff)
+				backoff = min(backoff*2, maxBackoff)
 				continue
 			}
 		}
 
+		backoff = 100 * time.Millisecond // reset on success
 		go s.handleConn(ctx, conn)
 	}
 }
