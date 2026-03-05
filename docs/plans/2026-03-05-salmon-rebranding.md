@@ -114,11 +114,11 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Run `make test-app` - must pass before next task
 
 ### Task 10: Update Makefile app-related targets
-- [ ] Update `build-app` target: project path, scheme name
-- [ ] Update `test-app` target: project path, scheme name
-- [ ] Update `dmg` target: app name references
-- [ ] Update `tools/create-dmg.sh`: volume name, app name references
-- [ ] Run `make build-app` and `make dmg` to verify
+- [x] Update `build-app` target: project path, scheme name
+- [x] Update `test-app` target: project path, scheme name
+- [x] Update `dmg` target: app name references
+- [x] Update `tools/create-dmg.sh`: volume name, app name references
+- [x] Run `make build-app` and `make dmg` to verify
 
 ### Task 11: Update bear-xcall bundle ID (keep name, update org)
 - [ ] Update `tools/bear-xcall/Info.plist`: bundle ID `com.bear-sync.bear-xcall` -> `com.salmon.bear-xcall`

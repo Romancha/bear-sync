@@ -1,9 +1,9 @@
 #!/bin/bash
-# create-dmg.sh — Creates a .dmg disk image for BearBridge.app distribution.
+# create-dmg.sh — Creates a .dmg disk image for SalmonRun.app distribution.
 #
-# Usage: ./tools/create-dmg.sh <path-to-BearBridge.app> <output.dmg>
+# Usage: ./tools/create-dmg.sh <path-to-SalmonRun.app> <output.dmg>
 #
-# Creates a compressed read-only DMG containing BearBridge.app and
+# Creates a compressed read-only DMG containing SalmonRun.app and
 # a symlink to /Applications for drag-install.
 
 set -euo pipefail
@@ -22,7 +22,7 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 
 APP_NAME=$(basename "$APP_PATH")
-VOLUME_NAME="BearBridge"
+VOLUME_NAME="SalmonRun"
 
 # Create temporary directory for DMG contents
 STAGING_DIR=$(mktemp -d)

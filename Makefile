@@ -70,42 +70,42 @@ endif
 
 build-app: build build-xcall
 ifeq ($(shell uname),Darwin)
-	@echo "Building BearBridge.app..."
-	xcodebuild -project tools/bear-bridge-app/BearBridge.xcodeproj \
-		-scheme BearBridge -configuration Release \
+	@echo "Building SalmonRun.app..."
+	xcodebuild -project tools/salmon-run-app/SalmonRun.xcodeproj \
+		-scheme SalmonRun -configuration Release \
 		CONFIGURATION_BUILD_DIR=$(CURDIR)/bin/xcodebuild-out \
 		CODE_SIGN_IDENTITY="$(CODESIGN_IDENTITY)" \
 		MACOSX_DEPLOYMENT_TARGET=14.0 \
 		build
-	@mkdir -p bin/BearBridge.app/Contents/MacOS
-	cp -R bin/xcodebuild-out/BearBridge.app/ bin/BearBridge.app/
+	@mkdir -p bin/SalmonRun.app/Contents/MacOS
+	cp -R bin/xcodebuild-out/SalmonRun.app/ bin/SalmonRun.app/
 	rm -rf bin/xcodebuild-out
-	cp bin/$(BINARY_BRIDGE) bin/BearBridge.app/Contents/MacOS/$(BINARY_BRIDGE)
-	cp -R bin/bear-xcall.app bin/BearBridge.app/Contents/MacOS/
-	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements $(ENTITLEMENTS_SRC) --options runtime bin/BearBridge.app/Contents/MacOS/bear-xcall.app
-	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/BearBridge.app/Contents/MacOS/$(BINARY_BRIDGE)
-	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/BearBridge.app
+	cp bin/$(BINARY_BRIDGE) bin/SalmonRun.app/Contents/MacOS/$(BINARY_BRIDGE)
+	cp -R bin/bear-xcall.app bin/SalmonRun.app/Contents/MacOS/
+	codesign --force --deep --sign "$(CODESIGN_IDENTITY)" --entitlements $(ENTITLEMENTS_SRC) --options runtime bin/SalmonRun.app/Contents/MacOS/bear-xcall.app
+	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/SalmonRun.app/Contents/MacOS/$(BINARY_BRIDGE)
+	codesign --force --sign "$(CODESIGN_IDENTITY)" --options runtime bin/SalmonRun.app
 else
-	@echo "Skipping BearBridge.app build (macOS only)"
+	@echo "Skipping SalmonRun.app build (macOS only)"
 endif
 
 dmg: build-app
 ifeq ($(shell uname),Darwin)
-	@echo "Creating BearBridge .dmg..."
-	./tools/create-dmg.sh bin/BearBridge.app bin/BearBridge.dmg
+	@echo "Creating SalmonRun .dmg..."
+	./tools/create-dmg.sh bin/SalmonRun.app bin/SalmonRun.dmg
 else
 	@echo "Skipping .dmg creation (macOS only)"
 endif
 
 test-app:
 ifeq ($(shell uname),Darwin)
-	@echo "Running BearBridge Swift tests..."
-	xcodebuild -project tools/bear-bridge-app/BearBridge.xcodeproj \
-		-scheme BearBridge \
+	@echo "Running SalmonRun Swift tests..."
+	xcodebuild -project tools/salmon-run-app/SalmonRun.xcodeproj \
+		-scheme SalmonRun \
 		MACOSX_DEPLOYMENT_TARGET=14.0 \
 		test
 else
-	@echo "Skipping BearBridge tests (macOS only)"
+	@echo "Skipping SalmonRun tests (macOS only)"
 endif
 
 test:
