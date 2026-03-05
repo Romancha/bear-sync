@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.bear-sync.bear-xcall</string>
+	<string>com.salmon.bear-xcall</string>
 	<key>CFBundleName</key>
 	<string>bear-xcall</string>
 	<key>CFBundleExecutable</key>
@@ -22,7 +22,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.bear-sync.bear-xcall</string>
+			<string>com.salmon.bear-xcall</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>bear-xcall</string>

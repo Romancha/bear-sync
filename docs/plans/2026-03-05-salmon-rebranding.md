@@ -121,8 +121,8 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Run `make build-app` and `make dmg` to verify
 
 ### Task 11: Update bear-xcall bundle ID (keep name, update org)
-- [ ] Update `tools/bear-xcall/Info.plist`: bundle ID `com.bear-sync.bear-xcall` -> `com.salmon.bear-xcall`
-- [ ] Update any Makefile references if the bundle ID is used
+- [x] Update `tools/bear-xcall/Info.plist`: bundle ID `com.bear-sync.bear-xcall` -> `com.salmon.bear-xcall`
+- [x] Update any Makefile references if the bundle ID is used
 
 ### Task 12: Update README.md with Salmon branding and metaphor
 - [ ] Rewrite README header and description with Salmon branding
