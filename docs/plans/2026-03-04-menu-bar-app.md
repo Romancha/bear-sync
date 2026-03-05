@@ -107,7 +107,7 @@
 - [x] Run tests — must pass before next task
 
 ### Task 7: Build menu bar UI — status and sync control
-- [ ] Menu bar popup layout:
+- [x] Menu bar popup layout:
   ```
   ┌─────────────────────────┐
   │ ● Synced                │  ← status indicator (green/yellow/red)
@@ -125,12 +125,12 @@
   │ ▸ Quit Bear Bridge      │
   └─────────────────────────┘
   ```
-- [ ] Status indicator: green (synced), yellow (syncing), red (error) — reflected in menu bar icon
-- [ ] "Sync Now" button sends IPC command, shows spinner during sync
-- [ ] Statistics section shows live data from IPC status response
-- [ ] Wire up `BridgeIPCClient` to SwiftUI `@Observable` view model
-- [ ] Write XCTests for view model state transitions
-- [ ] Run tests — must pass before next task
+- [x] Status indicator: green (synced), yellow (syncing), red (error) — reflected in menu bar icon
+- [x] "Sync Now" button sends IPC command, shows spinner during sync
+- [x] Statistics section shows live data from IPC status response
+- [x] Wire up `BridgeIPCClient` to SwiftUI `@Observable` view model
+- [x] Write XCTests for view model state transitions
+- [x] Run tests — must pass before next task
 
 ### Task 8: Build log viewer window
 - [ ] Create `LogViewerWindow` — separate SwiftUI window opened from menu

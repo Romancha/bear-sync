@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MenuBarView: View {
-    @ObservedObject var appState: AppState
+    @ObservedObject var viewModel: StatusViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -24,10 +24,10 @@ struct MenuBarView: View {
                 Circle()
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
-                Text(appState.syncStatus.displayText)
+                Text(viewModel.syncStatus.displayText)
                     .font(.headline)
             }
-            Text("Last sync: \(appState.lastSyncDescription)")
+            Text("Last sync: \(viewModel.lastSyncDescription)")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -37,17 +37,27 @@ struct MenuBarView: View {
 
     private var syncButton: some View {
         Button {
-            // Will be wired to IPC in Task 7
+            Task {
+                await viewModel.syncNow()
+            }
         } label: {
-            Label("Sync Now", systemImage: "arrow.clockwise")
+            HStack(spacing: 6) {
+                if viewModel.isSyncing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.7)
+                }
+                Label("Sync Now", systemImage: "arrow.clockwise")
+            }
         }
+        .disabled(viewModel.isSyncing)
     }
 
     private var statsSection: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Notes: \(appState.stats.notesCount.formatted())")
-            Text("Tags: \(appState.stats.tagsCount.formatted())")
-            Text("Queue: \(appState.stats.queueCount) pending")
+            Text("Notes: \(viewModel.stats.notesCount.formatted())")
+            Text("Tags: \(viewModel.stats.tagsCount.formatted())")
+            Text("Queue: \(viewModel.stats.queueCount) pending")
         }
         .font(.caption)
         .padding(.horizontal, 12)
@@ -79,7 +89,7 @@ struct MenuBarView: View {
     }
 
     private var statusColor: Color {
-        switch appState.syncStatus {
+        switch viewModel.syncStatus {
         case .idle: return .green
         case .syncing: return .yellow
         case .error: return .red
