@@ -194,10 +194,10 @@
 - [x] Run linter — all issues must be fixed
 
 ### Task 14: [Final] Update documentation
-- [ ] Update README.md with menu bar app section
-- [ ] Add screenshots of menu bar UI
-- [ ] Document settings and configuration
-- [ ] Document how to switch from launchd agent to menu bar app
+- [x] Update README.md with menu bar app section
+- [x] Add screenshots of menu bar UI
+- [x] Document settings and configuration
+- [x] Document how to switch from launchd agent to menu bar app
 
 ## Technical Details
 
