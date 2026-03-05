@@ -183,15 +183,15 @@
 - [x] Verify full pipeline with pre-release tag
 
 ### Task 13: Verify acceptance criteria
-- [ ] Verify: menu bar icon appears and shows correct status
-- [ ] Verify: Sync Now triggers immediate sync and shows progress
-- [ ] Verify: log viewer displays real-time logs with filtering
-- [ ] Verify: settings persist across app restarts
-- [ ] Verify: Launch at Login works
-- [ ] Verify: bridge auto-restarts if process dies
-- [ ] Verify: app + bridge work after download from GitHub Releases (signed + notarized)
-- [ ] Run full test suite (Go unit tests + Swift XCTests)
-- [ ] Run linter — all issues must be fixed
+- [x] Verify: menu bar icon appears and shows correct status
+- [x] Verify: Sync Now triggers immediate sync and shows progress
+- [x] Verify: log viewer displays real-time logs with filtering
+- [x] Verify: settings persist across app restarts
+- [x] Verify: Launch at Login works
+- [x] Verify: bridge auto-restarts if process dies
+- [x] Verify: app + bridge work after download from GitHub Releases (signed + notarized)
+- [x] Run full test suite (Go unit tests + Swift XCTests)
+- [x] Run linter — all issues must be fixed
 
 ### Task 14: [Final] Update documentation
 - [ ] Update README.md with menu bar app section
