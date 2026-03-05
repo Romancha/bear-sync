@@ -67,7 +67,7 @@ struct BearBridgeApp: App {
             return .secondary
         }
         switch appModel.statusViewModel.syncStatus {
-        case .idle: return .primary
+        case .idle: return .green
         case .syncing: return .yellow
         case .error: return .red
         }

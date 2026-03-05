@@ -174,15 +174,15 @@ Based on MeetAlert's `EnhancedSettingsView` — NavigationSplitView with sidebar
 - [x] Update tests
 
 ### Task 8: Polish and verify
-- [ ] Verify menu bar icon changes color correctly (green/yellow/red)
-- [ ] Verify Sync Now triggers sync and shows progress
-- [ ] Verify log viewer displays real-time logs with filtering
-- [ ] Verify settings persist across app restarts
-- [ ] Verify Launch at Login works
-- [ ] Verify bridge auto-restarts on crash
-- [ ] Run full test suite: `make test && make test-app`
-- [ ] Run linter: `make lint`
-- [ ] Update README with final installation instructions
+- [x] Verify menu bar icon changes color correctly (green/yellow/red)
+- [x] Verify Sync Now triggers sync and shows progress
+- [x] Verify log viewer displays real-time logs with filtering
+- [x] Verify settings persist across app restarts
+- [x] Verify Launch at Login works
+- [x] Verify bridge auto-restarts on crash
+- [x] Run full test suite: `make test && make test-app`
+- [x] Run linter: `make lint`
+- [x] Update README with final installation instructions
 
 ## Technical Details
 
