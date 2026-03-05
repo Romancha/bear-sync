@@ -27,6 +27,7 @@ final class StatusViewModel: ObservableObject {
     private let ipcClient: IPCClientProtocol
     private let pollInterval: TimeInterval
     private var pollTask: Task<Void, Never>?
+    private var notificationService: NotificationServiceProtocol?
 
     var lastSyncDescription: String {
         guard let lastSync = lastSyncTime else {
@@ -41,9 +42,14 @@ final class StatusViewModel: ObservableObject {
         syncStatus.iconColor
     }
 
-    init(ipcClient: IPCClientProtocol, pollInterval: TimeInterval = 5) {
+    init(
+        ipcClient: IPCClientProtocol,
+        pollInterval: TimeInterval = 5,
+        notificationService: NotificationServiceProtocol? = nil
+    ) {
         self.ipcClient = ipcClient
         self.pollInterval = pollInterval
+        self.notificationService = notificationService
     }
 
     /// Start polling the daemon for status updates.
@@ -86,8 +92,10 @@ final class StatusViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 500_000_000)
             await refreshStatus()
         } catch {
-            lastError = error.localizedDescription
+            let errorMsg = error.localizedDescription
+            lastError = errorMsg
             syncStatus = .error
+            notificationService?.showSyncError(errorMsg)
         }
         isSyncing = false
     }
@@ -99,7 +107,11 @@ final class StatusViewModel: ObservableObject {
         if !response.lastSync.isEmpty, let date = ISO8601DateFormatter().date(from: response.lastSync) {
             lastSyncTime = date
         }
-        lastError = response.lastError.isEmpty ? nil : response.lastError
+        let newError = response.lastError.isEmpty ? nil : response.lastError
+        if let errorMsg = newError, errorMsg != lastError {
+            notificationService?.showSyncError(errorMsg)
+        }
+        lastError = newError
         stats = SyncStats(
             notesCount: response.stats.notesSynced,
             tagsCount: response.stats.tagsSynced,

@@ -156,12 +156,12 @@
 - [x] Run tests — must pass before next task
 
 ### Task 10: Add error notifications
-- [ ] Show macOS notification (`UNUserNotificationCenter`) on sync errors
-- [ ] Notification shows error summary, click opens log viewer
-- [ ] Rate-limit notifications (max 1 per 5 minutes for same error)
-- [ ] Notification preference in settings (on/off)
-- [ ] Write XCTests for notification rate limiting
-- [ ] Run tests — must pass before next task
+- [x] Show macOS notification (`UNUserNotificationCenter`) on sync errors
+- [x] Notification shows error summary, click opens log viewer
+- [x] Rate-limit notifications (max 1 per 5 minutes for same error)
+- [x] Notification preference in settings (on/off)
+- [x] Write XCTests for notification rate limiting
+- [x] Run tests — must pass before next task
 
 ### Task 11: Add write queue status display
 - [ ] Show pending write queue items count in menu popup

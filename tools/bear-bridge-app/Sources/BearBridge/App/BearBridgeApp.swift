@@ -1,16 +1,33 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let openLogViewer = Notification.Name("openLogViewer")
+}
+
 @main
 struct BearBridgeApp: App {
     @StateObject private var viewModel: StatusViewModel
     @StateObject private var logViewModel: LogViewModel
     @StateObject private var settingsManager: SettingsManager
+    @Environment(\.openWindow) private var openWindow
+    private let notificationService: NotificationService
 
     init() {
         let ipcClient = BridgeIPCClient()
-        _viewModel = StateObject(wrappedValue: StatusViewModel(ipcClient: ipcClient))
+        let settings = SettingsManager()
+        let notifications = NotificationService()
+        notifications.isEnabled = settings.notificationsEnabled
+        notifications.onOpenLogViewer = {
+            NotificationCenter.default.post(name: .openLogViewer, object: nil)
+        }
+
+        _viewModel = StateObject(wrappedValue: StatusViewModel(
+            ipcClient: ipcClient,
+            notificationService: notifications
+        ))
         _logViewModel = StateObject(wrappedValue: LogViewModel(ipcClient: ipcClient))
-        _settingsManager = StateObject(wrappedValue: SettingsManager())
+        _settingsManager = StateObject(wrappedValue: settings)
+        self.notificationService = notifications
     }
 
     var body: some Scene {
@@ -21,6 +38,9 @@ struct BearBridgeApp: App {
                 }
                 .onDisappear {
                     viewModel.stopPolling()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .openLogViewer)) { _ in
+                    openWindow(id: "log-viewer")
                 }
         } label: {
             Image(systemName: menuBarIcon)
@@ -36,6 +56,9 @@ struct BearBridgeApp: App {
 
         Window("Bear Bridge Settings", id: "settings") {
             SettingsWindow(settings: settingsManager)
+                .onReceive(settingsManager.$notificationsEnabled) { enabled in
+                    notificationService.isEnabled = enabled
+                }
         }
         .defaultSize(width: 450, height: 300)
     }
