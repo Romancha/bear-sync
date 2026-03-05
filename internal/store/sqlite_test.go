@@ -1240,6 +1240,10 @@ func TestProcessSyncPush_MetadataOnlyChangeNoConflict(t *testing.T) {
 	assert.Equal(t, "pending_to_bear", got.SyncStatus, "metadata-only change should NOT trigger conflict")
 	assert.Equal(t, "Same Title", got.Title, "title should be preserved")
 	assert.Equal(t, "Consumer Body", got.Body, "consumer body should be preserved")
+	require.NotNil(t, got.PendingBearTitle, "PendingBearTitle should survive Bear delta push")
+	assert.Equal(t, "Same Title", *got.PendingBearTitle)
+	require.NotNil(t, got.PendingBearBody, "PendingBearBody should survive Bear delta push")
+	assert.Equal(t, "Original Body", *got.PendingBearBody)
 }
 
 func TestProcessSyncPush_FieldLevelConflict(t *testing.T) {
@@ -1560,4 +1564,37 @@ func TestAckApplied_PreservesPendingBearFieldsWhenOtherPending(t *testing.T) {
 	assert.Equal(t, "Bear Title", *note.PendingBearTitle)
 	require.NotNil(t, note.PendingBearBody, "PendingBearBody should be preserved when other pending items exist")
 	assert.Equal(t, "Bear Body", *note.PendingBearBody)
+}
+
+func TestAckConflictResolved_ClearsPendingBearFields(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	bearID := "bear-conflict-resolved"
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:               "n-conflict-resolved",
+		BearID:           &bearID,
+		Title:            "Title",
+		Body:             "Body",
+		SyncStatus:       "conflict",
+		PendingBearTitle: strPtr("Old Bear Title"),
+		PendingBearBody:  strPtr("Old Bear Body"),
+	}))
+
+	item, err := s.EnqueueWrite(ctx, "key-conflict-resolved", "update", "n-conflict-resolved", `{"title":"T"}`, "")
+	require.NoError(t, err)
+
+	_, err = s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
+	require.NoError(t, err)
+
+	err = s.AckQueueItems(ctx, []models.SyncAckItem{
+		{QueueID: item.ID, IdempotencyKey: "key-conflict-resolved", Status: "applied", ConflictResolved: true},
+	})
+	require.NoError(t, err)
+
+	note, err := s.GetNote(ctx, "n-conflict-resolved")
+	require.NoError(t, err)
+	assert.Equal(t, "synced", note.SyncStatus, "conflict should be resolved to synced")
+	assert.Nil(t, note.PendingBearTitle, "PendingBearTitle should be NULL after conflict resolved")
+	assert.Nil(t, note.PendingBearBody, "PendingBearBody should be NULL after conflict resolved")
 }

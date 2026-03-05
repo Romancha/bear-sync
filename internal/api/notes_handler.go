@@ -799,7 +799,6 @@ func isRetryableQueueItem(item *models.WriteQueueItem, err error) bool {
 	return err == nil && item != nil && item.Status != "failed"
 }
 
-// logNoteRestoreError logs when a note state rollback fails after an enqueue error.
 // snapshotPendingBear stores Bear's current title/body as the base for field-level conflict detection.
 // Only sets fields on initial transition to pending_to_bear; preserves existing snapshot on consecutive updates.
 func snapshotPendingBear(note *models.Note) {
@@ -812,6 +811,7 @@ func snapshotPendingBear(note *models.Note) {
 	note.PendingBearBody = &bearBody
 }
 
+// logNoteRestoreError logs when a note state rollback fails after an enqueue error.
 func logNoteRestoreError(noteID string, enqueueErr, restoreErr error) {
 	slog.Error("failed to restore note state after enqueue failure", //nolint:gosec // G706: error strings are internal
 		"note_id", noteID, "enqueue_error", enqueueErr.Error(), "restore_error", restoreErr.Error())

@@ -235,7 +235,7 @@ Each note has a `sync_status` field:
 
 - `synced` — normal state; Bear deltas freely update hub fields
 - `pending_to_bear` — a write is queued; title/body are protected from Bear overwrites
-- `conflict` — a Bear push arrived with newer `modified_at` while the note was `pending_to_bear`; the bridge creates a `[Conflict] Title` note in Bear instead of applying the queued change
+- `conflict` — a Bear push arrived while the note was `pending_to_bear` and Bear changed a content field (title or body) that the consumer also changed; metadata-only changes do not trigger conflict. The bridge creates a `[Conflict] Title` note in Bear instead of applying the queued change
 
 ## Error Codes
 
