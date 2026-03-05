@@ -8,39 +8,95 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            statusSection
-            Divider()
-            syncButton
-            Divider()
-            statsSection
-            queueSection
-            Divider()
-            menuActions
-            Divider()
-            quitButton
-        }
-        .padding(.vertical, 4)
-    }
+        VStack(alignment: .leading, spacing: 0) {
+            // Sync Status
+            sectionHeader("Sync Status")
+            StatusIndicator(
+                status: viewModel.syncStatus,
+                lastSyncDescription: viewModel.lastSyncDescription,
+                bridgeConnected: viewModel.bridgeConnected,
+                lastError: viewModel.lastError
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
 
-    private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
-                Text(viewModel.syncStatus.displayText)
-                    .font(.headline)
+            Divider()
+
+            // Statistics
+            sectionHeader("Statistics")
+            VStack(spacing: 4) {
+                StatRow(label: "Notes", value: viewModel.stats.notesCount.formatted())
+                StatRow(label: "Tags", value: viewModel.stats.tagsCount.formatted())
+                StatRow(label: "Queue", value: "\(viewModel.queueItems.count) pending")
             }
-            Text("Last sync: \(viewModel.lastSyncDescription)")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+
+            // Write Queue (conditional)
+            if !viewModel.queueItems.isEmpty {
+                Divider()
+                sectionHeader("Write Queue")
+                VStack(spacing: 4) {
+                    ForEach(viewModel.queueItems) { item in
+                        QueueItemRow(item: item)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+
+            Divider()
+
+            // Actions
+            VStack(spacing: 0) {
+                syncNowButton
+                ActionButton(title: "View Logs...", systemImage: "doc.text") {
+                    openWindow(id: "log-viewer")
+                }
+                ActionButton(title: "Settings...", systemImage: "gear") {
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                }
+            }
+            .padding(.vertical, 4)
+
+            Divider()
+
+            // Quit
+            Button {
+                appModel.shutdown()
+                NSApplication.shared.terminate(nil)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "power")
+                        .frame(width: 16)
+                        .foregroundColor(.secondary)
+                    Text("Quit Bear Bridge")
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .keyboardShortcut("q")
         }
-        .padding(.horizontal, 12)
         .padding(.vertical, 4)
+        .frame(width: 280)
     }
 
-    private var syncButton: some View {
+    // MARK: - Subviews
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+    }
+
+    private var syncNowButton: some View {
         Button {
             Task {
                 if appModel.processManager.state == .stopped {
@@ -61,96 +117,25 @@ struct MenuBarView: View {
                 await viewModel.syncNow()
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if viewModel.isSyncing {
                     ProgressView()
                         .controlSize(.small)
                         .scaleEffect(0.7)
+                        .frame(width: 16)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .frame(width: 16)
+                        .foregroundColor(.secondary)
                 }
-                Label("Sync Now", systemImage: "arrow.clockwise")
+                Text("Sync Now")
+                Spacer()
             }
+            .contentShape(Rectangle())
         }
-        .disabled(viewModel.isSyncing || viewModel.syncStatus == .syncing)
-    }
-
-    private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Notes synced: \(viewModel.stats.notesCount.formatted())")
-            Text("Tags synced: \(viewModel.stats.tagsCount.formatted())")
-            Text("Queue: \(viewModel.queueItems.count) pending")
-        }
-        .font(.caption)
+        .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
-    }
-
-    @ViewBuilder
-    private var queueSection: some View {
-        if !viewModel.queueItems.isEmpty {
-            Divider()
-            DisclosureGroup("Write Queue (\(viewModel.queueItems.count))") {
-                ForEach(viewModel.queueItems) { item in
-                    HStack(spacing: 6) {
-                        Text(item.action)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        if !item.noteTitle.isEmpty {
-                            Text(item.noteTitle)
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Text(item.status)
-                            .font(.caption2)
-                            .foregroundColor(queueItemStatusColor(item.status))
-                    }
-                }
-            }
-            .font(.caption)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 2)
-        }
-    }
-
-    private var menuActions: some View {
-        Group {
-            Button {
-                openWindow(id: "log-viewer")
-            } label: {
-                Label("View Logs...", systemImage: "doc.text")
-            }
-            Button {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } label: {
-                Label("Settings...", systemImage: "gear")
-            }
-        }
-    }
-
-    private var quitButton: some View {
-        Button {
-            appModel.shutdown()
-            NSApplication.shared.terminate(nil)
-        } label: {
-            Text("Quit Bear Bridge")
-        }
-        .keyboardShortcut("q")
-    }
-
-    private var statusColor: Color {
-        switch viewModel.syncStatus {
-        case .idle: return .green
-        case .syncing: return .yellow
-        case .error: return .red
-        }
-    }
-
-    private func queueItemStatusColor(_ status: String) -> Color {
-        switch status {
-        case "applied": return .green
-        case "failed": return .red
-        case "conflict": return .orange
-        default: return .secondary
-        }
+        .disabled(viewModel.isSyncing || viewModel.syncStatus == .syncing)
     }
 }

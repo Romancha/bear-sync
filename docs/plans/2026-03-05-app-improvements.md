@@ -102,7 +102,7 @@ Three improvements to the BearBridge menu bar app:
 ### Task 5: Redesign Menu Bar popup UI
 Based on MeetAlert patterns — clean sections, proper styling, native macOS feel.
 
-- [ ] Redesign `MenuBarView.swift` with sections:
+- [x] Redesign `MenuBarView.swift` with sections:
   ```
   ┌─────────────────────────────────────┐
   │  Sync Status                        │
@@ -128,21 +128,21 @@ Based on MeetAlert patterns — clean sections, proper styling, native macOS fee
   │                                     │
   └─────────────────────────────────────┘
   ```
-- [ ] Extract reusable components (like MeetAlert's Components/):
+- [x] Extract reusable components (like MeetAlert's Components/):
   - `StatusIndicator` — colored dot with label
   - `StatRow` — label + value row
   - `QueueItemRow` — write queue item display
   - `ActionButton` — styled menu action button
-- [ ] Use proper SwiftUI styling:
+- [x] Use proper SwiftUI styling:
   - `.groupBoxStyle` or section headers for visual grouping
   - Consistent padding and spacing
   - Native macOS control styling
   - Monospaced font for stats values
-- [ ] Menu bar label view:
+- [x] Menu bar label view:
   - SF Symbol icon that changes based on status
   - Optional: show brief status text next to icon (like MeetAlert's SmartStatusText)
-- [ ] Set appropriate `.defaultSize()` for the popup window
-- [ ] Update tests for new view structure
+- [x] Set appropriate `.defaultSize()` for the popup window
+- [x] Update tests for new view structure
 
 ### Task 6: Redesign Log Viewer window
 - [ ] Redesign `LogViewerWindow.swift`:

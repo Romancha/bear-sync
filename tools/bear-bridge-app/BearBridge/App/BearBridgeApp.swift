@@ -52,10 +52,20 @@ struct BearBridgeApp: App {
     }
 
     private var menuBarIcon: String {
-        "arrow.triangle.2.circlepath"
+        if !appModel.statusViewModel.bridgeConnected {
+            return "arrow.triangle.2.circlepath"
+        }
+        switch appModel.statusViewModel.syncStatus {
+        case .idle: return "arrow.triangle.2.circlepath"
+        case .syncing: return "arrow.triangle.2.circlepath"
+        case .error: return "exclamationmark.arrow.triangle.2.circlepath"
+        }
     }
 
     private var menuBarIconColor: Color {
+        if !appModel.statusViewModel.bridgeConnected {
+            return .secondary
+        }
         switch appModel.statusViewModel.syncStatus {
         case .idle: return .primary
         case .syncing: return .yellow
