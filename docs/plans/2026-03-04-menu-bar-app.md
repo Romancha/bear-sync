@@ -145,15 +145,15 @@
 - [x] Run tests — must pass before next task
 
 ### Task 9: Build settings window
-- [ ] Create `SettingsWindow` with tabs/sections:
+- [x] Create `SettingsWindow` with tabs/sections:
   - **Connection**: Hub URL, Hub Token, Bear Token (secure storage in Keychain)
   - **Sync**: interval slider (1-30 min), sync on app launch toggle
   - **General**: Launch at Login toggle (via `SMAppService` or `LoginItem`), notification preferences
-- [ ] Settings persist to `UserDefaults` (non-sensitive) and `Keychain` (tokens)
-- [ ] Settings generate environment for bridge process (replaces `.env.bridge`)
-- [ ] Launch at Login uses `SMAppService.mainApp` (macOS 13+)
-- [ ] Write XCTests for settings persistence and environment generation
-- [ ] Run tests — must pass before next task
+- [x] Settings persist to `UserDefaults` (non-sensitive) and `Keychain` (tokens)
+- [x] Settings generate environment for bridge process (replaces `.env.bridge`)
+- [x] Launch at Login uses `SMAppService.mainApp` (macOS 13+)
+- [x] Write XCTests for settings persistence and environment generation
+- [x] Run tests — must pass before next task
 
 ### Task 10: Add error notifications
 - [ ] Show macOS notification (`UNUserNotificationCenter`) on sync errors

@@ -4,11 +4,13 @@ import SwiftUI
 struct BearBridgeApp: App {
     @StateObject private var viewModel: StatusViewModel
     @StateObject private var logViewModel: LogViewModel
+    @StateObject private var settingsManager: SettingsManager
 
     init() {
         let ipcClient = BridgeIPCClient()
         _viewModel = StateObject(wrappedValue: StatusViewModel(ipcClient: ipcClient))
         _logViewModel = StateObject(wrappedValue: LogViewModel(ipcClient: ipcClient))
+        _settingsManager = StateObject(wrappedValue: SettingsManager())
     }
 
     var body: some Scene {
@@ -31,6 +33,11 @@ struct BearBridgeApp: App {
             LogViewerWindow(viewModel: logViewModel)
         }
         .defaultSize(width: 700, height: 500)
+
+        Window("Bear Bridge Settings", id: "settings") {
+            SettingsWindow(settings: settingsManager)
+        }
+        .defaultSize(width: 450, height: 300)
     }
 
     private var menuBarIcon: String {

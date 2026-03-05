@@ -74,7 +74,7 @@ struct MenuBarView: View {
                 Label("View Logs...", systemImage: "doc.text")
             }
             Button {
-                // Will open settings window in Task 9
+                openWindow(id: "settings")
             } label: {
                 Label("Settings...", systemImage: "gear")
             }
