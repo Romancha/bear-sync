@@ -47,11 +47,16 @@ final class BridgeProcessManager {
 
     static let maxRetries = 3
 
+    /// Minimum uptime (seconds) before a crash resets the retry counter.
+    /// If the process ran longer than this before crashing, it's treated as a fresh crash streak.
+    static let stableUptimeThreshold: TimeInterval = 60
+
     private(set) var state: State = .stopped
     private var processHandle: ProcessHandle?
     private let parser = OutputParser()
     private var retryCount = 0
     private var launchGeneration: Int = 0
+    private var lastLaunchTime: Date?
     private let environmentProvider: () -> [String: String]
     private let launcher: ProcessLauncher
     private let binaryPath: String?
@@ -157,6 +162,7 @@ final class BridgeProcessManager {
             onTermination: { [weak self] status in self?.handleTermination(status: status, generation: generation) }
         )
         processHandle = handle
+        lastLaunchTime = Date()
         state = .running
         onStateChange?(.running)
     }
@@ -196,6 +202,10 @@ final class BridgeProcessManager {
         }
 
         // Unexpected termination — try to restart with backoff delay.
+        // If the process ran long enough, treat this as a fresh crash streak.
+        if let launched = lastLaunchTime, Date().timeIntervalSince(launched) >= Self.stableUptimeThreshold {
+            retryCount = 0
+        }
         retryCount += 1
         if retryCount <= Self.maxRetries {
             state = .restarting(attempt: retryCount)

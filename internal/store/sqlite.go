@@ -284,16 +284,21 @@ func (s *SQLiteStore) migratePendingBearColumns(ctx context.Context) error {
 		return fmt.Errorf("read notes DDL: %w", err)
 	}
 
-	if ddlSQL.Valid && strings.Contains(ddlSQL.String, "pending_bear_title") {
-		return nil // columns already exist
+	ddl := ""
+	if ddlSQL.Valid {
+		ddl = ddlSQL.String
 	}
 
-	if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_title TEXT"); err != nil {
-		return fmt.Errorf("add pending_bear_title column: %w", err)
+	if !strings.Contains(ddl, "pending_bear_title") {
+		if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_title TEXT"); err != nil {
+			return fmt.Errorf("add pending_bear_title column: %w", err)
+		}
 	}
 
-	if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_body TEXT"); err != nil {
-		return fmt.Errorf("add pending_bear_body column: %w", err)
+	if !strings.Contains(ddl, "pending_bear_body") {
+		if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_body TEXT"); err != nil {
+			return fmt.Errorf("add pending_bear_body column: %w", err)
+		}
 	}
 
 	return nil

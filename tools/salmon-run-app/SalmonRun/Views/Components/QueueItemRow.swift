@@ -33,7 +33,7 @@ struct QueueItemRow: View {
         case "applied": return .green
         case "failed": return .red
         case "conflict": return .orange
-        case "leased": return .blue
+        case "processing": return .blue
         default: return .secondary
         }
     }
