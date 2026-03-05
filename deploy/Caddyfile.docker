@@ -1,4 +1,4 @@
-{$DOMAIN:bear-sync.example.com} {
+{$DOMAIN:salmon.example.com} {
 	reverse_proxy hub:7433
 	log {
 		output stdout

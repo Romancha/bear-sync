@@ -67,10 +67,10 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Run `make test` - must pass before next task
 
 ### Task 4: Rename deployment configs
-- [ ] Rename file `deploy/bear-sync-hub.service` -> `deploy/salmon-hub.service`
-- [ ] Update service file contents: description, user, group, paths (`/opt/bear-sync/` -> `/opt/salmon/`)
-- [ ] Update `deploy/Caddyfile`: domain and log path references
-- [ ] Update `deploy/Caddyfile.docker`: domain reference
+- [x] Rename file `deploy/bear-sync-hub.service` -> `deploy/salmon-hub.service`
+- [x] Update service file contents: description, user, group, paths (`/opt/bear-sync/` -> `/opt/salmon/`)
+- [x] Update `deploy/Caddyfile`: domain and log path references
+- [x] Update `deploy/Caddyfile.docker`: domain reference
 
 ### Task 5: Rename CI/CD workflows
 - [ ] Update `.github/workflows/docker-publish.yml`: image name `bear-sync-hub` -> `salmon-hub`

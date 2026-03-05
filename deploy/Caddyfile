@@ -1,4 +1,4 @@
-bear-sync.example.com {
+salmon.example.com {
 	# Rate limiting: consumers 60 req/min, bridge 120 req/min
 	# Requires caddy-ratelimit plugin: https://github.com/mholt/caddy-ratelimit
 	rate_limit {
@@ -23,6 +23,6 @@ bear-sync.example.com {
 	reverse_proxy 127.0.0.1:7433
 
 	log {
-		output file /var/log/caddy/bear-sync.log
+		output file /var/log/caddy/salmon.log
 	}
 }

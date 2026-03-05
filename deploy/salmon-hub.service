@@ -1,0 +1,24 @@
+[Unit]
+Description=Salmon Hub API Server
+After=network.target
+
+[Service]
+Type=simple
+User=salmon
+Group=salmon
+WorkingDirectory=/opt/salmon
+ExecStart=/opt/salmon/bin/hub
+Restart=on-failure
+RestartSec=5
+
+EnvironmentFile=/opt/salmon/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/salmon/data /opt/salmon/attachments
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
