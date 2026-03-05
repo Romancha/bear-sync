@@ -1,10 +1,10 @@
 # Consumer API Quick Start Guide
 
-The Bear Sync Hub API lets external consumers read and write Bear notes through a REST API. Bear remains the source of truth — writes go through a queue and are applied to Bear by the bridge agent.
+The Salmon Hub API lets external consumers read and write Bear notes through a REST API. Bear remains the source of truth — writes go through a queue and are applied to Bear by the bridge agent.
 
 ## Base URL
 
-All endpoints are served under the hub's address. Replace `$HUB_URL` with your hub's base URL (e.g., `https://bear-sync.example.com`).
+All endpoints are served under the hub's address. Replace `$HUB_URL` with your hub's base URL (e.g., `https://salmon.example.com`).
 
 ## Authentication
 
@@ -14,7 +14,7 @@ Every request must include a Bearer token in the `Authorization` header:
 Authorization: Bearer <your-consumer-token>
 ```
 
-Tokens are provisioned by the hub operator via the `HUB_CONSUMER_TOKENS` environment variable. Each consumer gets a unique name and token.
+Tokens are provisioned by the hub operator via the `SALMON_HUB_CONSUMER_TOKENS` environment variable. Each consumer gets a unique name and token.
 
 ## Idempotency
 

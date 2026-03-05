@@ -144,8 +144,8 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Update CI/CD section with new workflow references
 
 ### Task 14: Update remaining documentation
-- [ ] Update `docs/consumer-api.md` with new naming
-- [ ] Update completed plans in `docs/plans/completed/` — leave as historical record (no changes needed)
+- [x] Update `docs/consumer-api.md` with new naming
+- [x] Update completed plans in `docs/plans/completed/` — leave as historical record (no changes needed)
 
 ### Task 15: Verify acceptance criteria
 - [ ] `make fmt` passes
