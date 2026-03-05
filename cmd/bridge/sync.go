@@ -10,6 +10,7 @@ import (
 
 	"github.com/romancha/bear-sync/internal/beardb"
 	"github.com/romancha/bear-sync/internal/hubclient"
+	"github.com/romancha/bear-sync/internal/ipc"
 	"github.com/romancha/bear-sync/internal/mapper"
 	"github.com/romancha/bear-sync/internal/models"
 	"github.com/romancha/bear-sync/internal/xcallback"
@@ -32,6 +33,7 @@ type Bridge struct {
 	logger      *slog.Logger
 	sleepFn     func(time.Duration) // injectable sleep for testing
 	events      *EventEmitter       // structured status events (nil = disabled)
+	stats       *ipc.StatsTracker   // IPC stats tracker (nil = not in daemon mode)
 	cycleNotes  int                 // notes synced in current cycle (reset per Run)
 	cycleTags   int                 // tags synced in current cycle (reset per Run)
 	cycleQueue  int                 // queue items processed in current cycle (reset per Run)

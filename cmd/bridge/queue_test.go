@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/romancha/bear-sync/internal/beardb"
+	"github.com/romancha/bear-sync/internal/ipc"
 	"github.com/romancha/bear-sync/internal/models"
 	"github.com/romancha/bear-sync/internal/xcallback"
 )
@@ -1134,4 +1135,95 @@ func TestCountByStatus(t *testing.T) {
 	assert.Equal(t, 2, countByStatus(items, "applied"))
 	assert.Equal(t, 1, countByStatus(items, "failed"))
 	assert.Equal(t, 0, countByStatus(items, "pending"))
+}
+
+// --- buildQueueStatusItems and extractNoteTitle tests ---
+
+func TestBuildQueueStatusItems(t *testing.T) {
+	items := []models.WriteQueueItem{
+		{ID: 1, Action: "create", Payload: `{"title":"My Note","body":"content"}`, Status: "processing", CreatedAt: "2026-03-04T12:00:00Z"},
+		{ID: 2, Action: "add_tag", Payload: `{"tag":"work","bear_id":"note-1"}`, Status: "processing"},
+		{ID: 3, Action: "rename_tag", Payload: `{"name":"old","new_name":"new"}`, Status: "pending"},
+	}
+
+	result := buildQueueStatusItems(items)
+
+	require.Len(t, result, 3)
+
+	assert.Equal(t, int64(1), result[0].ID)
+	assert.Equal(t, "create", result[0].Action)
+	assert.Equal(t, "My Note", result[0].NoteTitle)
+	assert.Equal(t, "processing", result[0].Status)
+	assert.Equal(t, "2026-03-04T12:00:00Z", result[0].CreatedAt)
+
+	assert.Equal(t, int64(2), result[1].ID)
+	assert.Equal(t, "add_tag", result[1].Action)
+	assert.Equal(t, "work", result[1].NoteTitle)
+
+	assert.Equal(t, int64(3), result[2].ID)
+	assert.Equal(t, "rename_tag", result[2].Action)
+	assert.Equal(t, "old", result[2].NoteTitle)
+}
+
+func TestExtractNoteTitle(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  string
+		action   string
+		expected string
+	}{
+		{"create with title", `{"title":"My Note","body":"content"}`, "create", "My Note"},
+		{"update with title", `{"title":"Updated","body":"content"}`, "update", "Updated"},
+		{"add_tag extracts tag", `{"tag":"work"}`, "add_tag", "work"},
+		{"rename_tag extracts name", `{"name":"old","new_name":"new"}`, "rename_tag", "old"},
+		{"delete_tag extracts name", `{"name":"tag/to/delete"}`, "delete_tag", "tag/to/delete"},
+		{"trash no title", `{"bear_id":"note-1"}`, "trash", ""},
+		{"invalid json", `{invalid`, "create", ""},
+		{"empty payload", `{}`, "create", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractNoteTitle(tt.payload, tt.action)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestProcessQueue_StatsTrackerUpdated(t *testing.T) {
+	db := &mockBearDB{
+		notesByUUID: map[string]*beardb.NoteBasicInfo{
+			"bear-note-1": {UUID: "bear-note-1", Title: "Note", Body: "old"},
+		},
+	}
+	hub := &mockHubClient{
+		queueItems: []models.WriteQueueItem{
+			{
+				ID:             100,
+				IdempotencyKey: "idem-100",
+				Action:         "update",
+				NoteID:         "bear-note-1",
+				Payload:        `{"title":"My Note","body":"new body"}`,
+				Status:         "processing",
+				CreatedAt:      "2026-03-04T12:00:00Z",
+			},
+		},
+	}
+	xcall := &mockXCallback{}
+	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
+
+	// Set a stats tracker to verify queue tracking.
+	stats := ipc.NewStatsTracker(0)
+	bridge.stats = stats
+
+	err := bridge.processQueue(context.Background())
+	require.NoError(t, err)
+
+	// Stats tracker should have the processed item with "applied" status.
+	queueResp := stats.GetQueueStatus()
+	require.Len(t, queueResp.Items, 1)
+	assert.Equal(t, int64(100), queueResp.Items[0].ID)
+	assert.Equal(t, "update", queueResp.Items[0].Action)
+	assert.Equal(t, "My Note", queueResp.Items[0].NoteTitle)
+	assert.Equal(t, "applied", queueResp.Items[0].Status)
 }

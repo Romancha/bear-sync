@@ -55,3 +55,28 @@ struct IPCLogsResponse: Codable, Equatable {
     let entries: [IPCLogEntry]
     let error: String?
 }
+
+/// A single write queue item from IPC queue_status response.
+/// Matches Go `ipc.QueueStatusItem`.
+struct IPCQueueStatusItem: Codable, Equatable, Identifiable {
+    let id: Int64
+    let action: String
+    let noteTitle: String
+    let status: String
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case action
+        case noteTitle = "note_title"
+        case status
+        case createdAt = "created_at"
+    }
+}
+
+/// Response to "queue_status" IPC command.
+/// Matches Go `ipc.QueueStatusResponse`.
+struct IPCQueueStatusResponse: Codable, Equatable {
+    let items: [IPCQueueStatusItem]
+    let error: String?
+}

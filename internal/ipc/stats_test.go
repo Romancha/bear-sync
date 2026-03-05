@@ -183,6 +183,87 @@ func TestStatsTracker_ConcurrentAccess(t *testing.T) {
 	assert.Equal(t, 100, status.Stats.NotesSynced)
 }
 
+func TestStatsTracker_QueueStatus_Empty(t *testing.T) {
+	st := NewStatsTracker(0)
+	resp := st.GetQueueStatus()
+	assert.Empty(t, resp.Items)
+	assert.Empty(t, resp.Error)
+}
+
+func TestStatsTracker_SetQueueItems(t *testing.T) {
+	st := NewStatsTracker(0)
+	items := []QueueStatusItem{
+		{ID: 1, Action: "create", NoteTitle: "Note 1", Status: "processing", CreatedAt: "2026-03-04T12:00:00Z"},
+		{ID: 2, Action: "update", NoteTitle: "Note 2", Status: "processing"},
+	}
+	st.SetQueueItems(items)
+
+	resp := st.GetQueueStatus()
+	require.Len(t, resp.Items, 2)
+	assert.Equal(t, int64(1), resp.Items[0].ID)
+	assert.Equal(t, "create", resp.Items[0].Action)
+	assert.Equal(t, "Note 1", resp.Items[0].NoteTitle)
+	assert.Equal(t, "processing", resp.Items[0].Status)
+	assert.Equal(t, "2026-03-04T12:00:00Z", resp.Items[0].CreatedAt)
+}
+
+func TestStatsTracker_SetQueueItems_ReplacesExisting(t *testing.T) {
+	st := NewStatsTracker(0)
+	st.SetQueueItems([]QueueStatusItem{{ID: 1, Action: "create"}})
+	st.SetQueueItems([]QueueStatusItem{{ID: 2, Action: "update"}, {ID: 3, Action: "trash"}})
+
+	resp := st.GetQueueStatus()
+	require.Len(t, resp.Items, 2)
+	assert.Equal(t, int64(2), resp.Items[0].ID)
+	assert.Equal(t, int64(3), resp.Items[1].ID)
+}
+
+func TestStatsTracker_UpdateQueueItemStatus(t *testing.T) {
+	st := NewStatsTracker(0)
+	st.SetQueueItems([]QueueStatusItem{
+		{ID: 1, Action: "create", Status: "processing"},
+		{ID: 2, Action: "update", Status: "processing"},
+	})
+
+	st.UpdateQueueItemStatus(1, "applied")
+
+	resp := st.GetQueueStatus()
+	assert.Equal(t, "applied", resp.Items[0].Status)
+	assert.Equal(t, "processing", resp.Items[1].Status)
+}
+
+func TestStatsTracker_UpdateQueueItemStatus_NotFound(t *testing.T) {
+	st := NewStatsTracker(0)
+	st.SetQueueItems([]QueueStatusItem{{ID: 1, Action: "create", Status: "processing"}})
+
+	// Should not panic when ID not found.
+	st.UpdateQueueItemStatus(999, "applied")
+
+	resp := st.GetQueueStatus()
+	assert.Equal(t, "processing", resp.Items[0].Status)
+}
+
+func TestStatsTracker_ClearQueueItems(t *testing.T) {
+	st := NewStatsTracker(0)
+	st.SetQueueItems([]QueueStatusItem{{ID: 1, Action: "create"}})
+	st.ClearQueueItems()
+
+	resp := st.GetQueueStatus()
+	assert.Empty(t, resp.Items)
+}
+
+func TestStatsTracker_QueueStatus_IsCopy(t *testing.T) {
+	st := NewStatsTracker(0)
+	st.SetQueueItems([]QueueStatusItem{{ID: 1, Action: "create", Status: "processing"}})
+
+	resp := st.GetQueueStatus()
+	resp.Items[0].Status = "mutated"
+
+	// Original should be unchanged.
+	resp2 := st.GetQueueStatus()
+	assert.Equal(t, "processing", resp2.Items[0].Status)
+}
+
 func TestNewStatsTracker_DefaultBufferSize(t *testing.T) {
 	st := NewStatsTracker(0)
 	// Fill beyond default buffer size.

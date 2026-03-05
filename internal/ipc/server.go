@@ -55,11 +55,27 @@ type LogsResponse struct {
 	Error   string     `json:"error,omitempty"`
 }
 
+// QueueStatusItem represents a write queue item for IPC status display.
+type QueueStatusItem struct {
+	ID        int64  `json:"id"`
+	Action    string `json:"action"`
+	NoteTitle string `json:"note_title"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at,omitempty"`
+}
+
+// QueueStatusResponse is the response to a "queue_status" command.
+type QueueStatusResponse struct {
+	Items []QueueStatusItem `json:"items"`
+	Error string            `json:"error,omitempty"`
+}
+
 // StatusProvider provides current bridge status to the IPC server.
 type StatusProvider interface {
 	GetStatus() StatusResponse
 	TriggerSync()
 	GetLogs(n int) []LogEntry
+	GetQueueStatus() QueueStatusResponse
 }
 
 // Server is a Unix socket IPC server for the bridge daemon.
@@ -218,6 +234,9 @@ func (s *Server) dispatch(_ context.Context, conn net.Conn, req *Request) {
 		}
 		entries := s.provider.GetLogs(lines)
 		s.writeJSON(conn, LogsResponse{Entries: entries})
+	case "queue_status":
+		queueStatus := s.provider.GetQueueStatus()
+		s.writeJSON(conn, queueStatus)
 	case "quit":
 		s.writeJSON(conn, OkResponse{Ok: true})
 		// Signal shutdown via cancel.

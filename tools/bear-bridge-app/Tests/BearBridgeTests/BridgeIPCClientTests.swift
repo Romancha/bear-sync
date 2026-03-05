@@ -182,6 +182,54 @@ final class BridgeIPCClientTests: XCTestCase {
         XCTAssertEqual(response.entries[1].msg, "connection failed")
     }
 
+    // MARK: - getQueueStatus
+
+    func testGetQueueStatusSendsCorrectCommand() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCQueueStatusResponse(items: [], error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.getQueueStatus()
+
+        let req = transport.lastRequest()
+        XCTAssertEqual(req?["cmd"] as? String, "queue_status")
+    }
+
+    func testGetQueueStatusParsesResponse() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCQueueStatusResponse(
+            items: [
+                IPCQueueStatusItem(id: 1, action: "create", noteTitle: "My Note", status: "processing", createdAt: "2026-03-04T12:00:00Z"),
+                IPCQueueStatusItem(id: 2, action: "add_tag", noteTitle: "work", status: "applied", createdAt: nil),
+            ],
+            error: nil
+        ))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        let response = try await client.getQueueStatus()
+
+        XCTAssertEqual(response.items.count, 2)
+        XCTAssertEqual(response.items[0].id, 1)
+        XCTAssertEqual(response.items[0].action, "create")
+        XCTAssertEqual(response.items[0].noteTitle, "My Note")
+        XCTAssertEqual(response.items[0].status, "processing")
+        XCTAssertEqual(response.items[0].createdAt, "2026-03-04T12:00:00Z")
+        XCTAssertEqual(response.items[1].id, 2)
+        XCTAssertEqual(response.items[1].action, "add_tag")
+        XCTAssertEqual(response.items[1].status, "applied")
+        XCTAssertNil(response.items[1].createdAt)
+    }
+
+    func testGetQueueStatusEmptyItems() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCQueueStatusResponse(items: [], error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        let response = try await client.getQueueStatus()
+
+        XCTAssertTrue(response.items.isEmpty)
+    }
+
     // MARK: - quit
 
     func testQuitSendsCorrectCommand() async throws {
@@ -433,6 +481,51 @@ final class IPCModelsTests: XCTestCase {
 
         XCTAssertEqual(a, b)
         XCTAssertNotEqual(a, c)
+    }
+
+    func testQueueStatusResponseDecoding() throws {
+        let json = """
+        {"items":[{"id":1,"action":"create","note_title":"My Note","status":"processing","created_at":"2026-03-04T12:00:00Z"},{"id":2,"action":"add_tag","note_title":"work","status":"applied"}]}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCQueueStatusResponse.self, from: data)
+
+        XCTAssertEqual(response.items.count, 2)
+        XCTAssertEqual(response.items[0].id, 1)
+        XCTAssertEqual(response.items[0].action, "create")
+        XCTAssertEqual(response.items[0].noteTitle, "My Note")
+        XCTAssertEqual(response.items[0].status, "processing")
+        XCTAssertEqual(response.items[0].createdAt, "2026-03-04T12:00:00Z")
+        XCTAssertEqual(response.items[1].id, 2)
+        XCTAssertEqual(response.items[1].action, "add_tag")
+        XCTAssertEqual(response.items[1].noteTitle, "work")
+        XCTAssertEqual(response.items[1].status, "applied")
+        XCTAssertNil(response.items[1].createdAt)
+        XCTAssertNil(response.error)
+    }
+
+    func testQueueStatusResponseEmpty() throws {
+        let json = """
+        {"items":[]}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCQueueStatusResponse.self, from: data)
+
+        XCTAssertTrue(response.items.isEmpty)
+    }
+
+    func testQueueStatusItemEquatable() {
+        let a = IPCQueueStatusItem(id: 1, action: "create", noteTitle: "Note", status: "processing", createdAt: nil)
+        let b = IPCQueueStatusItem(id: 1, action: "create", noteTitle: "Note", status: "processing", createdAt: nil)
+        let c = IPCQueueStatusItem(id: 2, action: "update", noteTitle: "Note", status: "applied", createdAt: nil)
+
+        XCTAssertEqual(a, b)
+        XCTAssertNotEqual(a, c)
+    }
+
+    func testQueueStatusItemIdentifiable() {
+        let item = IPCQueueStatusItem(id: 42, action: "create", noteTitle: "Note", status: "processing", createdAt: nil)
+        XCTAssertEqual(item.id, 42)
     }
 }
 

@@ -63,6 +63,12 @@ final class BridgeIPCClient {
         return try await sendCommand(request)
     }
 
+    /// Retrieves the current write queue status.
+    func getQueueStatus() async throws -> IPCQueueStatusResponse {
+        let request = IPCRequest(cmd: "queue_status")
+        return try await sendCommand(request)
+    }
+
     /// Requests graceful shutdown of the bridge daemon.
     func quit() async throws -> IPCOkResponse {
         let request = IPCRequest(cmd: "quit")

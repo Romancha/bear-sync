@@ -164,15 +164,15 @@
 - [x] Run tests — must pass before next task
 
 ### Task 11: Add write queue status display
-- [ ] Show pending write queue items count in menu popup
-- [ ] Expandable section showing queue item details:
+- [x] Show pending write queue items count in menu popup
+- [x] Expandable section showing queue item details:
   - Action type (create, update, add_tag, etc.)
   - Target note title
   - Status (pending, leased, conflict)
-- [ ] Extend IPC protocol: `{"cmd":"queue_status"}` → queue items list
-- [ ] Implement Go-side handler for queue_status IPC command
-- [ ] Write tests (Go + Swift) for queue status
-- [ ] Run tests — must pass before next task
+- [x] Extend IPC protocol: `{"cmd":"queue_status"}` → queue items list
+- [x] Implement Go-side handler for queue_status IPC command
+- [x] Write tests (Go + Swift) for queue status
+- [x] Run tests — must pass before next task
 
 ### Task 12: Integrate app into distribution workflow
 - [ ] Update `release-bridge.yml` to build menu bar app (`xcodebuild` on macOS runner)

@@ -12,6 +12,7 @@ struct MenuBarView: View {
             syncButton
             Divider()
             statsSection
+            queueSection
             Divider()
             menuActions
             Divider()
@@ -59,11 +60,39 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Notes: \(viewModel.stats.notesCount.formatted())")
             Text("Tags: \(viewModel.stats.tagsCount.formatted())")
-            Text("Queue: \(viewModel.stats.queueCount) pending")
+            Text("Queue: \(viewModel.queueItems.count) pending")
         }
         .font(.caption)
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var queueSection: some View {
+        if !viewModel.queueItems.isEmpty {
+            Divider()
+            DisclosureGroup("Write Queue (\(viewModel.queueItems.count))") {
+                ForEach(viewModel.queueItems) { item in
+                    HStack(spacing: 6) {
+                        Text(item.action)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        if !item.noteTitle.isEmpty {
+                            Text(item.noteTitle)
+                                .font(.caption)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Text(item.status)
+                            .font(.caption2)
+                            .foregroundColor(queueItemStatusColor(item.status))
+                    }
+                }
+            }
+            .font(.caption)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 2)
+        }
     }
 
     private var menuActions: some View {
@@ -95,6 +124,15 @@ struct MenuBarView: View {
         case .idle: return .green
         case .syncing: return .yellow
         case .error: return .red
+        }
+    }
+
+    private func queueItemStatusColor(_ status: String) -> Color {
+        switch status {
+        case "applied": return .green
+        case "failed": return .red
+        case "conflict": return .orange
+        default: return .secondary
         }
     }
 }

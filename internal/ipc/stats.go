@@ -22,6 +22,8 @@ type StatsTracker struct {
 	logBuf  []LogEntry
 	logSize int
 
+	queueItems []QueueStatusItem
+
 	syncTrigger chan struct{}
 }
 
@@ -125,6 +127,43 @@ func (st *StatsTracker) RecordSync(notesSynced, tagsSynced, queueProcessed int, 
 	st.tagsSynced += tagsSynced
 	st.queueProcessed += queueProcessed
 	st.lastDurationMs = durationMs
+}
+
+// GetQueueStatus returns the current queue items snapshot for IPC clients.
+func (st *StatsTracker) GetQueueStatus() QueueStatusResponse {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+
+	items := make([]QueueStatusItem, len(st.queueItems))
+	copy(items, st.queueItems)
+	return QueueStatusResponse{Items: items}
+}
+
+// SetQueueItems replaces the current queue items snapshot (called when items are leased).
+func (st *StatsTracker) SetQueueItems(items []QueueStatusItem) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.queueItems = make([]QueueStatusItem, len(items))
+	copy(st.queueItems, items)
+}
+
+// UpdateQueueItemStatus updates the status of a specific queue item by ID.
+func (st *StatsTracker) UpdateQueueItemStatus(queueID int64, status string) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for i := range st.queueItems {
+		if st.queueItems[i].ID == queueID {
+			st.queueItems[i].Status = status
+			return
+		}
+	}
+}
+
+// ClearQueueItems removes all queue items (called after sync cycle completes).
+func (st *StatsTracker) ClearQueueItems() {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.queueItems = nil
 }
 
 // AddLog appends a log entry to the ring buffer.

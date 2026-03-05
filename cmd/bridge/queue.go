@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/romancha/bear-sync/internal/beardb"
+	"github.com/romancha/bear-sync/internal/ipc"
 	"github.com/romancha/bear-sync/internal/models"
 	"github.com/romancha/bear-sync/internal/xcallback"
 )
@@ -78,11 +79,20 @@ func (b *Bridge) processQueue(ctx context.Context) error {
 	b.events.Emit(&SyncEvent{Event: "sync_progress", Phase: "processing_queue", Items: len(items)})
 	b.logger.Info("processing write queue", "items", len(items))
 
+	// Snapshot leased items into stats tracker for IPC visibility.
+	if b.stats != nil {
+		b.stats.SetQueueItems(buildQueueStatusItems(items))
+	}
+
 	ackItems := make([]models.SyncAckItem, 0, len(items))
 
 	for i := range items {
 		ack := b.applyQueueItem(ctx, &items[i])
 		ackItems = append(ackItems, ack)
+		// Update individual item status in tracker after processing.
+		if b.stats != nil {
+			b.stats.UpdateQueueItemStatus(ack.QueueID, ack.Status)
+		}
 	}
 
 	if err := b.hub.AckQueue(ctx, ackItems); err != nil {
@@ -575,4 +585,48 @@ func countByStatus(items []models.SyncAckItem, status string) int {
 		}
 	}
 	return count
+}
+
+// buildQueueStatusItems converts leased WriteQueueItems to IPC QueueStatusItems.
+func buildQueueStatusItems(items []models.WriteQueueItem) []ipc.QueueStatusItem {
+	result := make([]ipc.QueueStatusItem, len(items))
+	for i := range items {
+		result[i] = ipc.QueueStatusItem{
+			ID:        items[i].ID,
+			Action:    items[i].Action,
+			NoteTitle: extractNoteTitle(items[i].Payload, items[i].Action),
+			Status:    items[i].Status,
+			CreatedAt: items[i].CreatedAt,
+		}
+	}
+	return result
+}
+
+// extractNoteTitle extracts the note title from a queue item payload where available.
+func extractNoteTitle(payload, action string) string {
+	var m map[string]any
+	if json.Unmarshal([]byte(payload), &m) != nil {
+		return ""
+	}
+
+	if title, ok := m["title"].(string); ok && title != "" {
+		return title
+	}
+
+	switch action {
+	case "rename_tag":
+		if name, ok := m["name"].(string); ok {
+			return name
+		}
+	case "delete_tag":
+		if name, ok := m["name"].(string); ok {
+			return name
+		}
+	case "add_tag":
+		if tag, ok := m["tag"].(string); ok {
+			return tag
+		}
+	}
+
+	return ""
 }

@@ -19,6 +19,7 @@ type mockProvider struct {
 	mu         sync.Mutex
 	status     StatusResponse
 	logs       []LogEntry
+	queueItems []QueueStatusItem
 	syncCalled bool
 }
 
@@ -43,6 +44,14 @@ func (m *mockProvider) GetLogs(n int) []LogEntry {
 	result := make([]LogEntry, n)
 	copy(result, m.logs[len(m.logs)-n:])
 	return result
+}
+
+func (m *mockProvider) GetQueueStatus() QueueStatusResponse {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	items := make([]QueueStatusItem, len(m.queueItems))
+	copy(items, m.queueItems)
+	return QueueStatusResponse{Items: items}
 }
 
 func testSocketPath(t *testing.T) string {
@@ -329,6 +338,47 @@ func TestServer_DoubleStartFails(t *testing.T) {
 	err := srv.Start(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already started")
+}
+
+func TestServer_QueueStatusCommand(t *testing.T) {
+	provider := &mockProvider{
+		queueItems: []QueueStatusItem{
+			{ID: 1, Action: "create", NoteTitle: "My Note", Status: "processing", CreatedAt: "2026-03-04T12:00:00Z"},
+			{ID: 2, Action: "add_tag", NoteTitle: "work", Status: "applied"},
+		},
+	}
+
+	sockPath := startTestServer(t, provider)
+	conn := dialSocket(t, sockPath)
+	defer conn.Close() //nolint:errcheck,gosec // test cleanup
+
+	resp := sendCmd(t, conn, Request{Cmd: "queue_status"})
+
+	var queueResp QueueStatusResponse
+	require.NoError(t, json.Unmarshal(resp, &queueResp))
+	require.Len(t, queueResp.Items, 2)
+	assert.Equal(t, int64(1), queueResp.Items[0].ID)
+	assert.Equal(t, "create", queueResp.Items[0].Action)
+	assert.Equal(t, "My Note", queueResp.Items[0].NoteTitle)
+	assert.Equal(t, "processing", queueResp.Items[0].Status)
+	assert.Equal(t, "2026-03-04T12:00:00Z", queueResp.Items[0].CreatedAt)
+	assert.Equal(t, int64(2), queueResp.Items[1].ID)
+	assert.Equal(t, "add_tag", queueResp.Items[1].Action)
+	assert.Equal(t, "applied", queueResp.Items[1].Status)
+}
+
+func TestServer_QueueStatusCommand_Empty(t *testing.T) {
+	provider := &mockProvider{}
+	sockPath := startTestServer(t, provider)
+
+	conn := dialSocket(t, sockPath)
+	defer conn.Close() //nolint:errcheck,gosec // test cleanup
+
+	resp := sendCmd(t, conn, Request{Cmd: "queue_status"})
+
+	var queueResp QueueStatusResponse
+	require.NoError(t, json.Unmarshal(resp, &queueResp))
+	assert.Empty(t, queueResp.Items)
 }
 
 func TestServer_SocketPermissions(t *testing.T) {

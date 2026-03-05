@@ -5,6 +5,7 @@ protocol IPCClientProtocol {
     func getStatus() async throws -> IPCStatusResponse
     func syncNow() async throws -> IPCOkResponse
     func getLogs(lines: Int) async throws -> IPCLogsResponse
+    func getQueueStatus() async throws -> IPCQueueStatusResponse
     func quit() async throws -> IPCOkResponse
 }
 
@@ -23,6 +24,7 @@ final class StatusViewModel: ObservableObject {
     @Published var stats: SyncStats = SyncStats()
     @Published var isSyncing: Bool = false
     @Published var bridgeConnected: Bool = false
+    @Published var queueItems: [IPCQueueStatusItem] = []
 
     private let ipcClient: IPCClientProtocol
     private let pollInterval: TimeInterval
@@ -76,6 +78,10 @@ final class StatusViewModel: ObservableObject {
             let response = try await ipcClient.getStatus()
             applyStatus(response)
             bridgeConnected = true
+            // Fetch queue status (non-critical — don't fail the whole refresh).
+            if let queueResponse = try? await ipcClient.getQueueStatus() {
+                queueItems = queueResponse.items
+            }
         } catch {
             bridgeConnected = false
         }

@@ -21,6 +21,7 @@ func runDaemonWithIPC(
 	ctx context.Context, bridge *Bridge, interval time.Duration, socketPath string, logger *slog.Logger,
 ) error {
 	stats := ipc.NewStatsTracker(0)
+	bridge.stats = stats
 
 	if socketPath != "" {
 		srv := ipc.NewServer(socketPath, stats, logger)
