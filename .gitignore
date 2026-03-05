@@ -9,5 +9,14 @@ coverage.html
 .env
 .idea/
 
+# macOS
+.DS_Store
+
+# Xcode / Swift build artifacts
+DerivedData/
+*.xcarchive
+*.app
+*.dmg
+
 # ralphex progress logs
 .ralphex/progress/
