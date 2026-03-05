@@ -145,7 +145,7 @@ Based on MeetAlert patterns — clean sections, proper styling, native macOS fee
 - [x] Update tests for new view structure
 
 ### Task 6: Redesign Log Viewer window
-- [ ] Redesign `LogViewerWindow.swift`:
+- [x] Redesign `LogViewerWindow.swift`:
   - Use `NavigationSplitView` or clean toolbar layout (like MeetAlert's settings)
   - Search field in toolbar
   - Level filter buttons with colored badges
@@ -153,11 +153,11 @@ Based on MeetAlert patterns — clean sections, proper styling, native macOS fee
   - Color-coded log levels (debug: gray, info: blue, warn: orange, error: red)
   - Auto-scroll toggle in toolbar
   - Timestamp + level + message in each row
-- [ ] Improve log entry rendering:
+- [x] Improve log entry rendering:
   - Use `Grid` or `LazyVStack` for better performance
   - Truncate long messages with disclosure
   - Copy-to-clipboard on click/right-click
-- [ ] Update tests
+- [x] Update tests
 
 ### Task 7: Redesign Settings window
 Based on MeetAlert's `EnhancedSettingsView` — NavigationSplitView with sidebar.

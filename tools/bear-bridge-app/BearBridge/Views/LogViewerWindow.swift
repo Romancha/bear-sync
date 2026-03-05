@@ -5,85 +5,40 @@ struct LogViewerWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
-            Divider()
-            logList
+            logContent
         }
-        .frame(minWidth: 600, minHeight: 400)
+        .frame(minWidth: 700, minHeight: 450)
+        .toolbar {
+            ToolbarItemGroup(placement: .automatic) {
+                levelFilterButtons
+                Spacer()
+                autoScrollToggle
+                clearButton
+            }
+        }
+        .searchable(text: $viewModel.searchText, prompt: "Search logs...")
         .task {
             await viewModel.loadFromIPC()
         }
     }
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 4) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                TextField("Search logs...", text: $viewModel.searchText)
-                    .textFieldStyle(.plain)
-                if !viewModel.searchText.isEmpty {
-                    Button {
-                        viewModel.searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(6)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(6)
-
-            levelFilters
-            autoScrollToggle
-        }
-        .padding(8)
-    }
-
-    private var levelFilters: some View {
-        HStack(spacing: 2) {
-            ForEach(LogLevel.allCases, id: \.rawValue) { level in
-                Button {
-                    viewModel.toggleLevel(level)
-                } label: {
-                    Text(level.shortLabel)
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(viewModel.isLevelActive(level) ? level.color.opacity(0.2) : Color.clear)
-                        .foregroundColor(viewModel.isLevelActive(level) ? level.color : .secondary)
-                        .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private var autoScrollToggle: some View {
-        Button {
-            viewModel.autoScroll.toggle()
-        } label: {
-            Image(systemName: viewModel.autoScroll ? "arrow.down.to.line.circle.fill" : "arrow.down.to.line")
-                .foregroundColor(viewModel.autoScroll ? .accentColor : .secondary)
-        }
-        .buttonStyle(.plain)
-        .help(viewModel.autoScroll ? "Auto-scroll enabled" : "Auto-scroll disabled")
-    }
-
-    private var logList: some View {
+    private var logContent: some View {
         ScrollViewReader { proxy in
-            List(viewModel.filteredEntries) { entry in
-                LogEntryRow(entry: entry)
-                    .id(entry.id)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(viewModel.filteredEntries) { entry in
+                        LogEntryRow(entry: entry)
+                            .id(entry.id)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
-            .listStyle(.plain)
             .onChange(of: viewModel.filteredEntries.count) { _ in
                 if viewModel.autoScroll, let lastID = viewModel.filteredEntries.last?.id {
-                    proxy.scrollTo(lastID, anchor: .bottom)
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                    }
                 }
             }
             .overlay {
@@ -94,6 +49,55 @@ struct LogViewerWindow: View {
                 }
             }
         }
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private var levelFilterButtons: some View {
+        HStack(spacing: 2) {
+            ForEach(LogLevel.allCases, id: \.rawValue) { level in
+                Button {
+                    viewModel.toggleLevel(level)
+                } label: {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(level.color)
+                            .frame(width: 6, height: 6)
+                        Text(level.shortLabel)
+                            .font(.caption.weight(.medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(viewModel.isLevelActive(level) ? level.color.opacity(0.15) : Color.clear)
+                    )
+                    .foregroundColor(viewModel.isLevelActive(level) ? level.color : .secondary.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var autoScrollToggle: some View {
+        Button {
+            viewModel.autoScroll.toggle()
+        } label: {
+            Image(systemName: viewModel.autoScroll ? "arrow.down.to.line.circle.fill" : "arrow.down.to.line.circle")
+                .foregroundColor(viewModel.autoScroll ? .accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+        .help(viewModel.autoScroll ? "Auto-scroll enabled" : "Auto-scroll disabled")
+    }
+
+    private var clearButton: some View {
+        Button {
+            viewModel.clearEntries()
+        } label: {
+            Image(systemName: "trash")
+                .foregroundColor(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help("Clear logs")
     }
 
     private var emptyState: some View {
@@ -116,12 +120,16 @@ struct LogViewerWindow: View {
 
 struct LogEntryRow: View {
     let entry: LogEntry
+    @State private var isExpanded: Bool = false
+    @State private var isHovered: Bool = false
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss.SSS"
         return f
     }()
+
+    private static let messageTruncationLimit = 200
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -132,15 +140,76 @@ struct LogEntryRow: View {
 
             Text(entry.level.shortLabel)
                 .font(.system(.caption, design: .monospaced).weight(.bold))
-                .foregroundColor(entry.level.color)
-                .frame(width: 36, alignment: .leading)
+                .foregroundColor(.white)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(entry.level.color.opacity(0.8))
+                )
+                .frame(width: 40, alignment: .leading)
 
-            Text(entry.message)
-                .font(.system(.caption, design: .monospaced))
-                .lineLimit(nil)
+            messageView
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 1)
+        .padding(.vertical, 3)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 3)
+                .fill(isHovered ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.1) : Color.clear)
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .contextMenu {
+            Button("Copy Message") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(entry.message, forType: .string)
+            }
+            Button("Copy Full Entry") {
+                let text = "\(Self.timeFormatter.string(from: entry.time)) [\(entry.level.shortLabel)] \(entry.message)"
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var messageView: some View {
+        let isTruncated = entry.message.count > Self.messageTruncationLimit
+
+        if isTruncated && !isExpanded {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(entry.message.prefix(Self.messageTruncationLimit)) + "...")
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(nil)
+                Button {
+                    isExpanded = true
+                } label: {
+                    Text("Show more")
+                        .font(.caption2)
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.message)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(nil)
+                    .textSelection(.enabled)
+                if isTruncated {
+                    Button {
+                        isExpanded = false
+                    } label: {
+                        Text("Show less")
+                            .font(.caption2)
+                            .foregroundColor(.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 }
 
@@ -158,7 +227,7 @@ extension LogLevel {
 
     var color: Color {
         switch self {
-        case .debug: return .secondary
+        case .debug: return .gray
         case .info: return .blue
         case .warn: return .orange
         case .error: return .red
