@@ -95,9 +95,7 @@ func runSyncCycle(ctx context.Context, bridge *Bridge, stats *ipc.StatsTracker, 
 	start := time.Now()
 
 	if err := bridge.Run(ctx); err != nil {
-		durationMs := time.Since(start).Milliseconds()
 		stats.SetError(err.Error())
-		stats.RecordSync(0, 0, 0, durationMs)
 		logger.Error("daemon: sync cycle failed", "error", err)
 	} else {
 		durationMs := time.Since(start).Milliseconds()

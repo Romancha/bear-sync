@@ -205,6 +205,7 @@ func TestSyncEvents_SyncError(t *testing.T) {
 	last := events[len(events)-1]
 	assert.Equal(t, "sync_error", last.Event)
 	assert.NotEmpty(t, last.Error)
+	assert.GreaterOrEqual(t, last.DurationMs, int64(0), "sync_error should include duration")
 }
 
 func TestSyncEvents_WithQueueProcessing(t *testing.T) {

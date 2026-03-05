@@ -74,7 +74,7 @@ func (b *Bridge) Run(ctx context.Context) (retErr error) {
 	defer func() {
 		durationMs := time.Since(start).Milliseconds()
 		if retErr != nil {
-			b.events.Emit(&SyncEvent{Event: "sync_error", Error: retErr.Error()})
+			b.events.Emit(&SyncEvent{Event: "sync_error", Error: retErr.Error(), DurationMs: durationMs})
 		} else {
 			b.events.Emit(&SyncEvent{
 				Event:       "sync_complete",
