@@ -872,6 +872,11 @@ func upsertNote(ctx context.Context, tx *sql.Tx, note *models.Note) error {
 	return insertNewNote(ctx, tx, note)
 }
 
+// updateExistingNote updates a note during a Bear delta push.
+// For pending_to_bear notes, title/body are deliberately excluded from the UPDATE — the hub record
+// preserves the consumer's version. Field-level conflict detection uses pending_bear_title/body
+// (Bear's snapshot at enqueue time) to compare against the incoming Bear delta and the consumer's
+// changes, so conflicts only fire when both sides modified the same content field.
 func updateExistingNote(
 	ctx context.Context, tx *sql.Tx, note *models.Note,
 	existingID, existingSyncStatus, existingModifiedAt string,

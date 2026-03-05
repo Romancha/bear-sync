@@ -91,8 +91,22 @@ Run these checks before committing (in order):
 
 - `synced`: normal state; Bear delta pushes overwrite hub fields freely
 - `pending_to_bear`: a consumer has enqueued a write; hub will NOT overwrite `title`/`body` from Bear delta pushes while in this state
-- `conflict`: set when a Bear push arrives for a `pending_to_bear` note with a newer `modified_at`; bridge creates a `[Conflict] Title` note in Bear instead of applying the queue item
+- `conflict`: set when a Bear push arrives for a `pending_to_bear` note where Bear changed a content field (title/body) that the consumer also changed; bridge creates a `[Conflict] Title` note in Bear instead of applying the queue item
 - Transitions: `synced` → `pending_to_bear` (on enqueue) → `synced` (on ack with "applied") or `conflict` (on conflicting Bear push)
+
+### Field-level conflict detection
+
+When a note transitions to `pending_to_bear`, Bear's current title/body are saved to `pending_bear_title`/`pending_bear_body` columns (the "base" snapshot). On the next Bear delta push:
+
+1. If `modified_at` unchanged → no conflict (as before)
+2. If `modified_at` changed and `pending_bear` fields are NULL (create flow) → timestamp-based conflict (fallback)
+3. If `modified_at` changed and `pending_bear` fields exist → field-level comparison:
+   - Bear changed title = `bearDelta.Title != pending_bear_title`
+   - Consumer changed title = `hub.Title != pending_bear_title`
+   - Conflict only if Bear AND consumer both changed the same field (title or body)
+   - Metadata-only changes (modified_at, pinned, etc.) never trigger conflict
+
+`pending_bear_title`/`pending_bear_body` are cleared when `sync_status` transitions back to `synced` (ack applied).
 
 ## Database
 
