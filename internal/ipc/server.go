@@ -111,10 +111,19 @@ func (s *Server) Start(ctx context.Context) error {
 	s.started = true
 	s.mu.Unlock()
 
-	// Remove stale socket file.
-	if err := os.Remove(s.socketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+	// Remove stale socket file — only if it is actually a Unix socket (or absent).
+	if info, err := os.Lstat(s.socketPath); err == nil {
+		if info.Mode().Type() != os.ModeSocket {
+			s.revertStarted()
+			return fmt.Errorf("ipc socket path %s exists but is not a Unix socket", s.socketPath)
+		}
+		if err := os.Remove(s.socketPath); err != nil {
+			s.revertStarted()
+			return fmt.Errorf("remove stale socket: %w", err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		s.revertStarted()
-		return fmt.Errorf("remove stale socket: %w", err)
+		return fmt.Errorf("stat ipc socket path: %w", err)
 	}
 
 	lc := net.ListenConfig{}
@@ -171,8 +180,10 @@ func (s *Server) Stop() error {
 		}
 	}
 
-	// Best-effort cleanup of socket file.
-	os.Remove(s.socketPath) //nolint:errcheck,gosec // best-effort cleanup
+	// Best-effort cleanup of socket file — only remove if it is a Unix socket.
+	if info, err := os.Lstat(s.socketPath); err == nil && info.Mode().Type() == os.ModeSocket {
+		os.Remove(s.socketPath) //nolint:errcheck,gosec // best-effort cleanup
+	}
 
 	s.logger.Info("ipc server stopped")
 	return closeErr

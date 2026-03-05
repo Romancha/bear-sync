@@ -149,6 +149,8 @@ final class StatusViewModel: ObservableObject {
         syncStatus = SyncStatus(rawValue: response.state) ?? .idle
         if !response.lastSync.isEmpty, let date = OutputParser.parseISO8601(response.lastSync) {
             lastSyncTime = date
+        } else {
+            lastSyncTime = nil
         }
         let newError = response.lastError.isEmpty ? nil : response.lastError
         if let errorMsg = newError, errorMsg != lastError {

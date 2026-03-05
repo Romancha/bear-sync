@@ -303,16 +303,33 @@ func TestServer_ConcurrentConnections(t *testing.T) {
 func TestServer_RemovesStaleSocket(t *testing.T) {
 	sockPath := testSocketPath(t)
 
-	// Create a stale socket file.
-	require.NoError(t, os.WriteFile(sockPath, []byte("stale"), 0o600))
+	// Create a real stale Unix socket by starting and stopping a listener.
+	lc := net.ListenConfig{}
+	ln, err := lc.Listen(context.Background(), "unix", sockPath)
+	require.NoError(t, err)
+	ln.(*net.UnixListener).SetUnlinkOnClose(false)
+	require.NoError(t, ln.Close())
+	// Socket file remains on disk after listener close (unlink-on-close disabled).
 
 	srv := NewServer(sockPath, &mockProvider{}, testLogger())
 	require.NoError(t, srv.Start(context.Background()))
 	t.Cleanup(func() { _ = srv.Stop() })
 
-	// Should be able to connect (stale file was removed).
+	// Should be able to connect (stale socket was removed and replaced).
 	conn := dialSocket(t, sockPath)
 	_ = conn.Close()
+}
+
+func TestServer_RejectsNonSocketPath(t *testing.T) {
+	sockPath := testSocketPath(t)
+
+	// Create a regular file at the socket path.
+	require.NoError(t, os.WriteFile(sockPath, []byte("not a socket"), 0o600))
+
+	srv := NewServer(sockPath, &mockProvider{}, testLogger())
+	err := srv.Start(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a Unix socket")
 }
 
 func TestServer_StopRemovesSocket(t *testing.T) {
