@@ -75,30 +75,6 @@ final class BridgeIPCClient {
         return try await sendCommand(request)
     }
 
-    /// Returns an AsyncStream that periodically polls bridge status.
-    /// The stream yields a new status response every `interval` seconds.
-    /// It terminates when the task is cancelled.
-    func statusStream(interval: TimeInterval = 5) -> AsyncStream<IPCStatusResponse> {
-        AsyncStream { continuation in
-            let task = Task {
-                while !Task.isCancelled {
-                    do {
-                        let status = try await getStatus()
-                        continuation.yield(status)
-                    } catch {
-                        // Connection failed — daemon might be down.
-                        // Keep polling; it may come back.
-                    }
-                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                }
-                continuation.finish()
-            }
-            continuation.onTermination = { _ in
-                task.cancel()
-            }
-        }
-    }
-
     // MARK: - Private
 
     private func sendCommand<T: Decodable>(_ request: IPCRequest) async throws -> T {
@@ -120,18 +96,6 @@ private struct IPCRequest: Encodable {
     init(cmd: String, lines: Int? = nil) {
         self.cmd = cmd
         self.lines = lines
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case cmd, lines
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(cmd, forKey: .cmd)
-        if let lines {
-            try container.encode(lines, forKey: .lines)
-        }
     }
 }
 

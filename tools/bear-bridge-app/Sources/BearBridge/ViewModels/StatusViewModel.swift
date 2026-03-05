@@ -40,10 +40,6 @@ final class StatusViewModel: ObservableObject {
         return formatter.localizedString(for: lastSync, relativeTo: Date())
     }
 
-    var statusColor: String {
-        syncStatus.iconColor
-    }
-
     init(
         ipcClient: IPCClientProtocol,
         pollInterval: TimeInterval = 5,

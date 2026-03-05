@@ -25,6 +25,7 @@ type StatsTracker struct {
 	queueItems []QueueStatusItem
 
 	syncTrigger chan struct{}
+	shutdownCh  chan struct{}
 }
 
 // NewStatsTracker creates a new StatsTracker with the given log buffer size.
@@ -37,6 +38,7 @@ func NewStatsTracker(logBufferSize int) *StatsTracker {
 		logBuf:      make([]LogEntry, 0, logBufferSize),
 		logSize:     logBufferSize,
 		syncTrigger: make(chan struct{}, 1),
+		shutdownCh:  make(chan struct{}, 1),
 	}
 }
 
@@ -164,6 +166,19 @@ func (st *StatsTracker) ClearQueueItems() {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.queueItems = nil
+}
+
+// RequestShutdown sends a non-blocking signal to request daemon shutdown.
+func (st *StatsTracker) RequestShutdown() {
+	select {
+	case st.shutdownCh <- struct{}{}:
+	default:
+	}
+}
+
+// ShutdownRequested returns the channel that receives shutdown request signals.
+func (st *StatsTracker) ShutdownRequested() <-chan struct{} {
+	return st.shutdownCh
 }
 
 // AddLog appends a log entry to the ring buffer.

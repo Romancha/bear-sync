@@ -51,6 +51,9 @@ func runDaemonWithIPC(
 			runSyncCycle(ctx, bridge, stats, logger)
 			// Reset ticker so next tick is a full interval from now.
 			ticker.Reset(interval)
+		case <-stats.ShutdownRequested():
+			logger.Info("daemon: shutdown requested via IPC")
+			return nil
 		}
 	}
 }
@@ -68,7 +71,8 @@ func runSyncCycle(ctx context.Context, bridge *Bridge, stats *ipc.StatsTracker, 
 	} else {
 		durationMs := time.Since(start).Milliseconds()
 		stats.SetIdle()
-		stats.RecordSync(0, 0, 0, durationMs)
+		stats.RecordSync(bridge.cycleNotes, bridge.cycleTags, bridge.cycleQueue, durationMs)
 		logger.Info("daemon: sync cycle completed", "duration_ms", durationMs)
 	}
+	stats.ClearQueueItems()
 }

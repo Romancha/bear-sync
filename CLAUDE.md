@@ -14,7 +14,9 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - internal/api/ — HTTP handlers with chi router (hub only); Swagger UI at /api/docs/
 - internal/api/docs/ — generated OpenAPI spec (swag init, committed to repo)
 - internal/xcallback/ — Bear x-callback-url executor via bear-xcall CLI (bridge only)
+- internal/ipc/ — Unix socket IPC server for daemon mode (bridge only)
 - tools/bear-xcall/ — Swift CLI source for bear-xcall .app bundle (macOS only, bridge dependency)
+- tools/bear-bridge-app/ — SwiftUI menu bar app (macOS 13+, wraps bridge daemon)
 - deploy/ — deployment configs (systemd unit, launchd plist, Caddyfile)
 - docs/ — consumer-facing documentation (API quick start guide)
 - testdata/ — test fixtures (test Bear SQLite)
@@ -35,6 +37,10 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - make install-bridge — install bridge + launchd agent to ~/bin/ (macOS only, works from repo or release archive)
 - make uninstall-bridge — uninstall bridge + launchd agent (macOS only)
 - make verify-bridge — verify installed bridge code signatures (macOS only)
+- make build-app — build BearBridge menu bar .app bundle (macOS only)
+- make test-app — run BearBridge Swift tests (macOS only)
+- make install-app — install BearBridge.app to ~/Applications/ (macOS only)
+- make uninstall-app — uninstall BearBridge.app (macOS only)
 
 ## After Making Changes
 
@@ -57,7 +63,7 @@ Run these checks before committing (in order):
 - context.Context in all external operations
 - Error wrapping: fmt.Errorf("message: %w", err)
 - Configuration via environment variables (no config files)
-- Tests with github.com/stretchr/testify (assert/require)
+- Tests with github.com/stretchr/testify (assert/require); Swift tests with XCTest (tools/bear-bridge-app/)
 - Line length limit: 140 characters
 - SQLite via modernc.org/sqlite (pure Go, no CGO)
 - Makefile dual-context detection: checks for `go.mod` to distinguish repo (build from source) vs release archive (pre-built signed binaries); adjusts source paths and build dependencies accordingly
@@ -96,6 +102,21 @@ Run these checks before committing (in order):
 
 - Bear SQLite uses Core Data epoch timestamps (float64 seconds since 2001-01-01)
 - Conversion: `unix_ts = core_data_ts + 978307200` (defined as `mapper.CoreDataEpochOffset`)
+
+## Bridge Daemon Mode
+
+- `--daemon` flag: runs continuous sync loop instead of one-shot (used by BearBridge.app)
+- `--version` flag: prints version and exits
+- `BRIDGE_SYNC_INTERVAL`: sync interval in seconds for daemon mode (default: 300)
+- `BRIDGE_IPC_SOCKET`: Unix socket path for IPC (default: `~/.bear-bridge.sock`)
+
+## IPC (Daemon Mode)
+
+- Unix socket at `~/.bear-bridge.sock` (configurable via `BRIDGE_IPC_SOCKET`)
+- JSON-based newline-delimited request/response protocol
+- Commands: status, sync_now, logs, queue_status, quit
+- Stats tracked via `ipc.StatsTracker` (notes, tags, queue items, last sync duration)
+- Structured status events emitted to stdout (sync_start, sync_progress, sync_complete, sync_error)
 
 ## Bridge State
 

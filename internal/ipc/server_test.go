@@ -16,11 +16,12 @@ import (
 
 // mockProvider implements StatusProvider for tests.
 type mockProvider struct {
-	mu         sync.Mutex
-	status     StatusResponse
-	logs       []LogEntry
-	queueItems []QueueStatusItem
-	syncCalled bool
+	mu             sync.Mutex
+	status         StatusResponse
+	logs           []LogEntry
+	queueItems     []QueueStatusItem
+	syncCalled     bool
+	shutdownCalled bool
 }
 
 func (m *mockProvider) GetStatus() StatusResponse {
@@ -52,6 +53,12 @@ func (m *mockProvider) GetQueueStatus() QueueStatusResponse {
 	items := make([]QueueStatusItem, len(m.queueItems))
 	copy(items, m.queueItems)
 	return QueueStatusResponse{Items: items}
+}
+
+func (m *mockProvider) RequestShutdown() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.shutdownCalled = true
 }
 
 func testSocketPath(t *testing.T) string {
@@ -185,15 +192,8 @@ func TestServer_LogsCommand_DefaultLines(t *testing.T) {
 }
 
 func TestServer_QuitCommand(t *testing.T) {
-	sockPath := testSocketPath(t)
 	provider := &mockProvider{}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	srv := NewServer(sockPath, provider, testLogger())
-	require.NoError(t, srv.Start(ctx))
-	t.Cleanup(func() { _ = srv.Stop() })
+	sockPath := startTestServer(t, provider)
 
 	conn := dialSocket(t, sockPath)
 	defer conn.Close() //nolint:errcheck,gosec // test cleanup
@@ -203,6 +203,10 @@ func TestServer_QuitCommand(t *testing.T) {
 	var ok OkResponse
 	require.NoError(t, json.Unmarshal(resp, &ok))
 	assert.True(t, ok.Ok)
+
+	provider.mu.Lock()
+	assert.True(t, provider.shutdownCalled)
+	provider.mu.Unlock()
 }
 
 func TestServer_UnknownCommand(t *testing.T) {

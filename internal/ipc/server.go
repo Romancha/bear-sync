@@ -76,6 +76,7 @@ type StatusProvider interface {
 	TriggerSync()
 	GetLogs(n int) []LogEntry
 	GetQueueStatus() QueueStatusResponse
+	RequestShutdown()
 }
 
 // Server is a Unix socket IPC server for the bridge daemon.
@@ -181,8 +182,8 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			default:
-				s.logger.Warn("ipc accept error", "error", err)
-				return
+				s.logger.Warn("ipc accept error, continuing", "error", err)
+				continue
 			}
 		}
 
@@ -239,12 +240,7 @@ func (s *Server) dispatch(_ context.Context, conn net.Conn, req *Request) {
 		s.writeJSON(conn, queueStatus)
 	case "quit":
 		s.writeJSON(conn, OkResponse{Ok: true})
-		// Signal shutdown via cancel.
-		s.mu.Lock()
-		if s.cancelFn != nil {
-			s.cancelFn()
-		}
-		s.mu.Unlock()
+		s.provider.RequestShutdown()
 	default:
 		s.writeJSON(conn, OkResponse{Ok: false, Error: fmt.Sprintf("unknown command: %s", req.Cmd)})
 	}

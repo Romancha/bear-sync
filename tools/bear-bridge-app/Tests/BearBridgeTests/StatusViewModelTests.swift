@@ -353,29 +353,6 @@ final class StatusViewModelTests: XCTestCase {
         XCTAssertGreaterThan(mock.getStatusCallCount, countAfterFirstStop)
     }
 
-    // MARK: - Status color
-
-    func testStatusColorIdle() {
-        let mock = MockIPCClient()
-        let vm = StatusViewModel(ipcClient: mock)
-        vm.syncStatus = .idle
-        XCTAssertEqual(vm.statusColor, "green")
-    }
-
-    func testStatusColorSyncing() {
-        let mock = MockIPCClient()
-        let vm = StatusViewModel(ipcClient: mock)
-        vm.syncStatus = .syncing
-        XCTAssertEqual(vm.statusColor, "yellow")
-    }
-
-    func testStatusColorError() {
-        let mock = MockIPCClient()
-        let vm = StatusViewModel(ipcClient: mock)
-        vm.syncStatus = .error
-        XCTAssertEqual(vm.statusColor, "red")
-    }
-
     // MARK: - Last sync description
 
     func testLastSyncDescriptionWithDate() {

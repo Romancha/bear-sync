@@ -193,6 +193,8 @@ This is not needed for Docker named volumes — they inherit permissions from th
 | `BEAR_TOKEN` | Yes | — | Token for Bear x-callback-url API (any string, e.g. `openssl rand -base64 32`; Bear will prompt to allow access on first use) |
 | `BRIDGE_STATE_PATH` | No | `~/.bear-bridge-state.json` | Path to bridge state file |
 | `BEAR_DB_DIR` | No | `~/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data` | Path to Bear Application Data directory |
+| `BRIDGE_SYNC_INTERVAL` | No | `300` | Sync interval in seconds (daemon mode only) |
+| `BRIDGE_IPC_SOCKET` | No | `~/.bear-bridge.sock` | Unix socket path for IPC (daemon mode only) |
 
 ### Running
 
@@ -202,6 +204,10 @@ export BRIDGE_HUB_TOKEN=<token>
 export BEAR_TOKEN=<token>
 ./bin/bear-bridge
 ```
+
+CLI flags:
+- `--daemon` — run continuously with periodic sync (default interval: 5 minutes)
+- `--version` — print version and exit
 
 The bridge runs once per invocation by default. Use launchd to schedule periodic runs, or use the [Menu Bar App](#menu-bar-app-bearbridgeapp) which manages the bridge in daemon mode with a GUI.
 
