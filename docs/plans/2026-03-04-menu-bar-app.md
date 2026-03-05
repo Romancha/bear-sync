@@ -83,17 +83,17 @@
 - [x] Write XCTests for app model initialization
 
 ### Task 5: Implement bridge process manager in Swift
-- [ ] Create `BridgeProcessManager` class:
+- [x] Create `BridgeProcessManager` class:
   - Locates `bear-bridge` binary (bundled in .app or in `~/bin/`)
   - Launches as `Process()` with `--daemon` flag
   - Captures stdout/stderr via `Pipe()`
   - Monitors process lifecycle (restart on unexpected exit, max 3 retries)
   - Passes environment variables from app settings
-- [ ] Parse JSON log lines from stdout into structured `LogEntry` model
-- [ ] Parse status events from stdout for real-time UI updates
-- [ ] Handle process termination on app quit
-- [ ] Write XCTests for process manager (mock Process)
-- [ ] Run tests — must pass before next task
+- [x] Parse JSON log lines from stdout into structured `LogEntry` model
+- [x] Parse status events from stdout for real-time UI updates
+- [x] Handle process termination on app quit
+- [x] Write XCTests for process manager (mock Process)
+- [x] Run tests — must pass before next task
 
 ### Task 6: Implement IPC client in Swift
 - [ ] Create `BridgeIPCClient` class:
