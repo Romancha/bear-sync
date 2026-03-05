@@ -141,6 +141,31 @@ final class AppModelTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
     }
 
+    // MARK: - State change wiring
+
+    func testStateChangeUpdatesBridgeConnected() {
+        let (model, launcher) = makeAppModel(configured: true)
+        model.initialize()
+
+        // Bridge starts running — onStateChange should set bridgeConnected to true
+        let startExpectation = XCTestExpectation(description: "bridgeConnected set on start")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            XCTAssertTrue(model.statusViewModel.bridgeConnected)
+            startExpectation.fulfill()
+        }
+        wait(for: [startExpectation], timeout: 1.0)
+
+        // Simulate clean exit — onStateChange should set bridgeConnected to false
+        model.processManager.stop()
+
+        let stopExpectation = XCTestExpectation(description: "bridgeConnected cleared on stop")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            XCTAssertFalse(model.statusViewModel.bridgeConnected)
+            stopExpectation.fulfill()
+        }
+        wait(for: [stopExpectation], timeout: 1.0)
+    }
+
     // MARK: - Schedule restart (debounced auto-restart)
 
     func testScheduleRestartDoesNothingBeforeInitialize() {

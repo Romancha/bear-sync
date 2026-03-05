@@ -142,12 +142,23 @@ jobs:
           cp -R bin/xcodebuild-out/BearBridge.app/ bin/BearBridge.app/
           rm -rf bin/xcodebuild-out
 
-          # Embed signed binaries
+          # Embed binaries
           cp bin/bear-bridge bin/BearBridge.app/Contents/MacOS/
           cp -R bin/bear-xcall.app bin/BearBridge.app/Contents/MacOS/
 
-          # Sign the outer app with --deep to re-sign embedded bundles in place
+          # Sign from inside out to preserve entitlements on nested bundles
           codesign --force --deep --sign "$CODESIGN_IDENTITY" \
+            --entitlements tools/bear-xcall/entitlements.plist \
+            --options runtime \
+            --timestamp \
+            bin/BearBridge.app/Contents/MacOS/bear-xcall.app
+
+          codesign --force --sign "$CODESIGN_IDENTITY" \
+            --options runtime \
+            --timestamp \
+            bin/BearBridge.app/Contents/MacOS/bear-bridge
+
+          codesign --force --sign "$CODESIGN_IDENTITY" \
             --options runtime \
             --timestamp \
             bin/BearBridge.app

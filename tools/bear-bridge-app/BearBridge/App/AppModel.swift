@@ -51,6 +51,11 @@ final class AppModel: ObservableObject {
                 statusVM.handleStatusEvent(event)
             }
         }
+        pm.onStateChange = { state in
+            DispatchQueue.main.async {
+                statusVM.bridgeConnected = (state == .running)
+            }
+        }
 
         self.restartDebounceSeconds = restartDebounceSeconds
         self.settingsManager = settings
