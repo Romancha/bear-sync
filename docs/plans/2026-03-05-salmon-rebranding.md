@@ -137,11 +137,11 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Update environment variable documentation with new names
 
 ### Task 13: Update CLAUDE.md
-- [ ] Update project name and description
-- [ ] Update project structure section with new paths
-- [ ] Update commands section with new binary/target names
-- [ ] Update all references to env vars, file paths, binary names
-- [ ] Update CI/CD section with new workflow references
+- [x] Update project name and description
+- [x] Update project structure section with new paths
+- [x] Update commands section with new binary/target names
+- [x] Update all references to env vars, file paths, binary names
+- [x] Update CI/CD section with new workflow references
 
 ### Task 14: Update remaining documentation
 - [ ] Update `docs/consumer-api.md` with new naming

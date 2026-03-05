@@ -1,4 +1,4 @@
-# bear-sync
+# salmon
 
 Monorepo with two Go binaries for syncing Bear notes with external consumers.
 
@@ -16,8 +16,8 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - internal/xcallback/ — Bear x-callback-url executor via bear-xcall CLI (bridge only)
 - internal/ipc/ — Unix socket IPC server for daemon mode (bridge only)
 - tools/bear-xcall/ — Swift CLI source for bear-xcall .app bundle (macOS only, bridge dependency)
-- tools/bear-bridge-app/ — SwiftUI menu bar app (macOS 14+, Xcode project, wraps bridge daemon)
-- tools/create-dmg.sh — script to create .dmg disk image for BearBridge.app distribution
+- tools/salmon-run-app/ — SwiftUI menu bar app (macOS 14+, Xcode project, wraps bridge daemon)
+- tools/create-dmg.sh — script to create .dmg disk image for SalmonRun.app distribution
 - deploy/ — deployment configs (systemd unit, Caddyfile)
 - docs/ — consumer-facing documentation (API quick start guide)
 - testdata/ — test fixtures (test Bear SQLite)
@@ -35,9 +35,9 @@ Monorepo with two Go binaries for syncing Bear notes with external consumers.
 - make generate — run go generate (moq)
 - make swagger — generate Swagger docs (swag init)
 - make test-xcall — run bear-xcall manual tests (macOS + Bear required)
-- make build-app — build BearBridge menu bar .app bundle (macOS only)
-- make test-app — run BearBridge Swift tests (macOS only)
-- make dmg — create BearBridge .dmg disk image (macOS only)
+- make build-app — build SalmonRun menu bar .app bundle (macOS only)
+- make test-app — run SalmonRun Swift tests (macOS only)
+- make dmg — create SalmonRun .dmg disk image (macOS only)
 
 ## After Making Changes
 
@@ -60,7 +60,7 @@ Run these checks before committing (in order):
 - context.Context in all external operations
 - Error wrapping: fmt.Errorf("message: %w", err)
 - Configuration via environment variables (no config files)
-- Tests with github.com/stretchr/testify (assert/require); Swift tests with XCTest (tools/bear-bridge-app/)
+- Tests with github.com/stretchr/testify (assert/require); Swift tests with XCTest (tools/salmon-run-app/)
 - Line length limit: 140 characters
 - SQLite via modernc.org/sqlite (pure Go, no CGO)
 
@@ -81,7 +81,7 @@ Run these checks before committing (in order):
 
 ## Auth
 
-- Multiple consumer Bearer tokens (api/* scope) configured via `HUB_CONSUMER_TOKENS`, plus one bridge token (sync/* scope)
+- Multiple consumer Bearer tokens (api/* scope) configured via `SALMON_HUB_CONSUMER_TOKENS`, plus one bridge token (sync/* scope)
 - Each consumer is identified by name and authenticated with its own token
 - Write queue items are attributed to the originating consumer via `consumer_id`
 - Encrypted notes are read-only (403 for write operations)
@@ -101,14 +101,14 @@ Run these checks before committing (in order):
 
 ## Bridge Daemon Mode
 
-- `--daemon` flag: runs continuous sync loop instead of one-shot (used by BearBridge.app)
+- `--daemon` flag: runs continuous sync loop instead of one-shot (used by SalmonRun.app)
 - `--version` flag: prints version and exits
-- `BRIDGE_SYNC_INTERVAL`: sync interval in seconds for daemon mode (default: 300)
-- `BRIDGE_IPC_SOCKET`: Unix socket path for IPC (default: `~/.bear-bridge.sock`)
+- `SALMON_SYNC_INTERVAL`: sync interval in seconds for daemon mode (default: 300)
+- `SALMON_IPC_SOCKET`: Unix socket path for IPC (default: `~/.salmon.sock`)
 
 ## IPC (Daemon Mode)
 
-- Unix socket at `~/.bear-bridge.sock` (configurable via `BRIDGE_IPC_SOCKET`)
+- Unix socket at `~/.salmon.sock` (configurable via `SALMON_IPC_SOCKET`)
 - JSON-based newline-delimited request/response protocol
 - Commands: status, sync_now, logs, queue_status, quit
 - Stats tracked via `ipc.StatsTracker` (notes, tags, queue items, last sync duration)
@@ -116,7 +116,7 @@ Run these checks before committing (in order):
 
 ## Bridge State
 
-- State file: `~/.bear-bridge-state.json` (path overridable via `BRIDGE_STATE_PATH`)
+- State file: `~/.salmon-state.json` (path overridable via `SALMON_STATE_PATH`)
 - `last_sync_at`: Core Data epoch (float64, NOT Unix epoch) — used as `>= lastSyncAt` delta read threshold
 - `junction_full_scan_counter`: incremented every cycle; triggers full junction table scan every 12 cycles (`junctionFullScanInterval`)
 - `known_*_ids`: Bear UUIDs seen on last sync; diffed against current Bear DB to produce `deleted_*_ids` in push requests
@@ -126,4 +126,4 @@ Run these checks before committing (in order):
 
 - `.github/workflows/ci.yml` — lint, test, test-race on push/PR
 - `.github/workflows/docker-publish.yml` — builds and pushes hub Docker image on v* tag
-- `.github/workflows/release-bridge.yml` — builds, signs, notarizes, and publishes BearBridge.app as .dmg disk images on v* tag (arm64 + amd64)
+- `.github/workflows/release-bridge.yml` — builds, signs, notarizes, and publishes SalmonRun.app as .dmg disk images on v* tag (arm64 + amd64)
