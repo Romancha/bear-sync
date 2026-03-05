@@ -96,15 +96,15 @@
 - [x] Run tests — must pass before next task
 
 ### Task 6: Implement IPC client in Swift
-- [ ] Create `BridgeIPCClient` class:
+- [x] Create `BridgeIPCClient` class:
   - Connects to Unix socket at `~/.bear-bridge.sock`
   - Sends JSON commands, parses JSON responses
   - Auto-reconnect on connection loss
   - Timeout handling (5s per request)
-- [ ] Implement methods: `getStatus()`, `syncNow()`, `getLogs(lines:)`, `quit()`
-- [ ] Publish status updates via Combine/async streams for SwiftUI binding
-- [ ] Write XCTests for IPC client (mock socket)
-- [ ] Run tests — must pass before next task
+- [x] Implement methods: `getStatus()`, `syncNow()`, `getLogs(lines:)`, `quit()`
+- [x] Publish status updates via Combine/async streams for SwiftUI binding
+- [x] Write XCTests for IPC client (mock socket)
+- [x] Run tests — must pass before next task
 
 ### Task 7: Build menu bar UI — status and sync control
 - [ ] Menu bar popup layout:

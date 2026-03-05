@@ -1,0 +1,484 @@
+import XCTest
+
+@testable import BearBridge
+
+// MARK: - Mock transport
+
+final class MockIPCTransport: IPCTransport {
+    var sendCallCount = 0
+    var lastRequestData: Data?
+    var lastSocketPath: String?
+    var responseData: Data?
+    var shouldThrow: Error?
+
+    func send(request: Data, to socketPath: String) async throws -> Data {
+        sendCallCount += 1
+        lastRequestData = request
+        lastSocketPath = socketPath
+        if let error = shouldThrow {
+            throw error
+        }
+        guard let data = responseData else {
+            throw IPCClientError.invalidResponse
+        }
+        return data
+    }
+
+    /// Set a JSON-encodable response.
+    func setResponse<T: Encodable>(_ value: T) {
+        responseData = try? JSONEncoder().encode(value)
+    }
+
+    /// Parse the last sent request JSON.
+    func lastRequest() -> [String: Any]? {
+        guard let data = lastRequestData else { return nil }
+        // Strip trailing newline
+        var cleaned = data
+        if cleaned.last == 0x0A {
+            cleaned.removeLast()
+        }
+        return try? JSONSerialization.jsonObject(with: cleaned) as? [String: Any]
+    }
+}
+
+// MARK: - BridgeIPCClient Tests
+
+final class BridgeIPCClientTests: XCTestCase {
+
+    // MARK: - Initialization
+
+    func testDefaultSocketPath() {
+        let client = BridgeIPCClient()
+        let expectedPath = FileManager.default.homeDirectoryForCurrentUser.path + "/.bear-bridge.sock"
+        XCTAssertEqual(client.socketPath, expectedPath)
+    }
+
+    func testCustomSocketPath() {
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock")
+        XCTAssertEqual(client.socketPath, "/tmp/test.sock")
+    }
+
+    // MARK: - getStatus
+
+    func testGetStatusSendsCorrectCommand() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCStatusResponse(
+            state: "idle",
+            lastSync: "2026-03-04T12:00:00Z",
+            lastError: "",
+            stats: IPCSyncStats(notesSynced: 100, tagsSynced: 10, queueProcessed: 5, lastDurationMs: 1200),
+            error: nil
+        ))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.getStatus()
+
+        let req = transport.lastRequest()
+        XCTAssertEqual(req?["cmd"] as? String, "status")
+        XCTAssertNil(req?["lines"])
+    }
+
+    func testGetStatusParsesResponse() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCStatusResponse(
+            state: "syncing",
+            lastSync: "2026-03-04T12:00:00Z",
+            lastError: "previous error",
+            stats: IPCSyncStats(notesSynced: 50, tagsSynced: 5, queueProcessed: 2, lastDurationMs: 800),
+            error: nil
+        ))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        let status = try await client.getStatus()
+
+        XCTAssertEqual(status.state, "syncing")
+        XCTAssertEqual(status.lastSync, "2026-03-04T12:00:00Z")
+        XCTAssertEqual(status.lastError, "previous error")
+        XCTAssertEqual(status.stats.notesSynced, 50)
+        XCTAssertEqual(status.stats.tagsSynced, 5)
+        XCTAssertEqual(status.stats.queueProcessed, 2)
+        XCTAssertEqual(status.stats.lastDurationMs, 800)
+    }
+
+    func testGetStatusThrowsOnTransportError() async {
+        let transport = MockIPCTransport()
+        transport.shouldThrow = IPCClientError.socketNotAvailable
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        do {
+            _ = try await client.getStatus()
+            XCTFail("Expected error")
+        } catch {
+            XCTAssertEqual(error as? IPCClientError, .socketNotAvailable)
+        }
+    }
+
+    // MARK: - syncNow
+
+    func testSyncNowSendsCorrectCommand() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCOkResponse(ok: true, error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.syncNow()
+
+        let req = transport.lastRequest()
+        XCTAssertEqual(req?["cmd"] as? String, "sync_now")
+    }
+
+    func testSyncNowParsesOkResponse() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCOkResponse(ok: true, error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        let response = try await client.syncNow()
+
+        XCTAssertTrue(response.ok)
+        XCTAssertNil(response.error)
+    }
+
+    // MARK: - getLogs
+
+    func testGetLogsSendsCorrectCommand() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCLogsResponse(entries: [], error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.getLogs(lines: 25)
+
+        let req = transport.lastRequest()
+        XCTAssertEqual(req?["cmd"] as? String, "logs")
+        XCTAssertEqual(req?["lines"] as? Int, 25)
+    }
+
+    func testGetLogsDefaultLines() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCLogsResponse(entries: [], error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.getLogs()
+
+        let req = transport.lastRequest()
+        XCTAssertEqual(req?["lines"] as? Int, 50)
+    }
+
+    func testGetLogsParsesEntries() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCLogsResponse(
+            entries: [
+                IPCLogEntry(time: "2026-03-04T12:00:00Z", level: "INFO", msg: "sync started"),
+                IPCLogEntry(time: "2026-03-04T12:00:01Z", level: "ERROR", msg: "connection failed"),
+            ],
+            error: nil
+        ))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        let response = try await client.getLogs()
+
+        XCTAssertEqual(response.entries.count, 2)
+        XCTAssertEqual(response.entries[0].level, "INFO")
+        XCTAssertEqual(response.entries[0].msg, "sync started")
+        XCTAssertEqual(response.entries[1].level, "ERROR")
+        XCTAssertEqual(response.entries[1].msg, "connection failed")
+    }
+
+    // MARK: - quit
+
+    func testQuitSendsCorrectCommand() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCOkResponse(ok: true, error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.quit()
+
+        let req = transport.lastRequest()
+        XCTAssertEqual(req?["cmd"] as? String, "quit")
+    }
+
+    func testQuitParsesResponse() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCOkResponse(ok: true, error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        let response = try await client.quit()
+
+        XCTAssertTrue(response.ok)
+    }
+
+    // MARK: - Error handling
+
+    func testInvalidResponseThrowsDecodingError() async {
+        let transport = MockIPCTransport()
+        transport.responseData = "not json".data(using: .utf8)
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        do {
+            let _: IPCStatusResponse = try await client.getStatus()
+            XCTFail("Expected decoding error")
+        } catch {
+            XCTAssertTrue(error is DecodingError)
+        }
+    }
+
+    func testTimeoutErrorPropagated() async {
+        let transport = MockIPCTransport()
+        transport.shouldThrow = IPCClientError.timeout
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        do {
+            _ = try await client.getStatus()
+            XCTFail("Expected timeout error")
+        } catch {
+            XCTAssertEqual(error as? IPCClientError, .timeout)
+        }
+    }
+
+    func testConnectionFailedErrorPropagated() async {
+        let transport = MockIPCTransport()
+        transport.shouldThrow = IPCClientError.connectionFailed("connect() failed: 61")
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        do {
+            _ = try await client.syncNow()
+            XCTFail("Expected connection error")
+        } catch {
+            if case .connectionFailed(let msg) = error as? IPCClientError {
+                XCTAssertTrue(msg.contains("61"))
+            } else {
+                XCTFail("Expected connectionFailed error")
+            }
+        }
+    }
+
+    // MARK: - Socket path passed to transport
+
+    func testSocketPathPassedToTransport() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCOkResponse(ok: true, error: nil))
+        let client = BridgeIPCClient(socketPath: "/custom/path.sock", transport: transport)
+
+        _ = try await client.syncNow()
+
+        XCTAssertEqual(transport.lastSocketPath, "/custom/path.sock")
+    }
+
+    // MARK: - Multiple sequential commands
+
+    func testMultipleCommandsEachCreateSeparateConnection() async throws {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCOkResponse(ok: true, error: nil))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        _ = try await client.syncNow()
+        _ = try await client.syncNow()
+        _ = try await client.syncNow()
+
+        XCTAssertEqual(transport.sendCallCount, 3)
+    }
+
+    // MARK: - statusStream
+
+    func testStatusStreamYieldsValues() async {
+        let transport = MockIPCTransport()
+        transport.setResponse(IPCStatusResponse(
+            state: "idle",
+            lastSync: "2026-03-04T12:00:00Z",
+            lastError: "",
+            stats: IPCSyncStats(notesSynced: 10, tagsSynced: 2, queueProcessed: 0, lastDurationMs: 500),
+            error: nil
+        ))
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: transport)
+
+        // Use a very short interval for testing
+        let stream = client.statusStream(interval: 0.05)
+        var received: [IPCStatusResponse] = []
+
+        // Collect a few values then cancel
+        let task = Task {
+            for await status in stream {
+                received.append(status)
+                if received.count >= 2 {
+                    break
+                }
+            }
+        }
+
+        // Wait for values to arrive
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        task.cancel()
+
+        XCTAssertGreaterThanOrEqual(received.count, 2)
+        XCTAssertEqual(received[0].state, "idle")
+    }
+
+    func testStatusStreamContinuesOnError() async {
+        // First call fails, second succeeds
+        let switchingTransport = SwitchingTransport()
+        switchingTransport.responses = [
+            .failure(IPCClientError.socketNotAvailable),
+            .success(IPCStatusResponse(
+                state: "idle",
+                lastSync: "",
+                lastError: "",
+                stats: IPCSyncStats(notesSynced: 0, tagsSynced: 0, queueProcessed: 0, lastDurationMs: 0),
+                error: nil
+            )),
+        ]
+        let client = BridgeIPCClient(socketPath: "/tmp/test.sock", transport: switchingTransport)
+
+        let stream = client.statusStream(interval: 0.05)
+        var received: [IPCStatusResponse] = []
+
+        let task = Task {
+            for await status in stream {
+                received.append(status)
+                if received.count >= 1 {
+                    break
+                }
+            }
+        }
+
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        task.cancel()
+
+        // Should have received the successful response despite the first failure
+        XCTAssertGreaterThanOrEqual(received.count, 1)
+        XCTAssertEqual(received[0].state, "idle")
+    }
+}
+
+// MARK: - IPCModels Tests
+
+final class IPCModelsTests: XCTestCase {
+
+    func testStatusResponseDecoding() throws {
+        let json = """
+        {"state":"idle","last_sync":"2026-03-04T12:00:00Z","last_error":"","stats":{"notes_synced":100,"tags_synced":10,"queue_processed":5,"last_duration_ms":1200}}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCStatusResponse.self, from: data)
+
+        XCTAssertEqual(response.state, "idle")
+        XCTAssertEqual(response.lastSync, "2026-03-04T12:00:00Z")
+        XCTAssertEqual(response.lastError, "")
+        XCTAssertEqual(response.stats.notesSynced, 100)
+        XCTAssertEqual(response.stats.tagsSynced, 10)
+        XCTAssertEqual(response.stats.queueProcessed, 5)
+        XCTAssertEqual(response.stats.lastDurationMs, 1200)
+        XCTAssertNil(response.error)
+    }
+
+    func testStatusResponseWithError() throws {
+        let json = """
+        {"state":"error","last_sync":"","last_error":"db locked","stats":{"notes_synced":0,"tags_synced":0,"queue_processed":0,"last_duration_ms":0},"error":"internal"}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCStatusResponse.self, from: data)
+
+        XCTAssertEqual(response.state, "error")
+        XCTAssertEqual(response.lastError, "db locked")
+        XCTAssertEqual(response.error, "internal")
+    }
+
+    func testOkResponseDecoding() throws {
+        let json = """
+        {"ok":true}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCOkResponse.self, from: data)
+
+        XCTAssertTrue(response.ok)
+        XCTAssertNil(response.error)
+    }
+
+    func testOkResponseWithError() throws {
+        let json = """
+        {"ok":false,"error":"unknown command: foo"}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCOkResponse.self, from: data)
+
+        XCTAssertFalse(response.ok)
+        XCTAssertEqual(response.error, "unknown command: foo")
+    }
+
+    func testLogsResponseDecoding() throws {
+        let json = """
+        {"entries":[{"time":"2026-03-04T12:00:00Z","level":"INFO","msg":"sync started"},{"time":"2026-03-04T12:00:01Z","level":"ERROR","msg":"failed"}]}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCLogsResponse.self, from: data)
+
+        XCTAssertEqual(response.entries.count, 2)
+        XCTAssertEqual(response.entries[0].time, "2026-03-04T12:00:00Z")
+        XCTAssertEqual(response.entries[0].level, "INFO")
+        XCTAssertEqual(response.entries[0].msg, "sync started")
+        XCTAssertNil(response.error)
+    }
+
+    func testLogsResponseEmpty() throws {
+        let json = """
+        {"entries":[]}
+        """
+        let data = json.data(using: .utf8)!
+        let response = try JSONDecoder().decode(IPCLogsResponse.self, from: data)
+
+        XCTAssertTrue(response.entries.isEmpty)
+    }
+
+    func testSyncStatsEquatable() {
+        let a = IPCSyncStats(notesSynced: 10, tagsSynced: 2, queueProcessed: 1, lastDurationMs: 500)
+        let b = IPCSyncStats(notesSynced: 10, tagsSynced: 2, queueProcessed: 1, lastDurationMs: 500)
+        let c = IPCSyncStats(notesSynced: 20, tagsSynced: 2, queueProcessed: 1, lastDurationMs: 500)
+
+        XCTAssertEqual(a, b)
+        XCTAssertNotEqual(a, c)
+    }
+}
+
+// MARK: - Helper: transport that switches between responses
+
+/// A transport that returns different results for sequential calls.
+final class SwitchingTransport: IPCTransport {
+    var responses: [Result<any Encodable, Error>] = []
+    private var callIndex = 0
+
+    func send(request: Data, to socketPath: String) async throws -> Data {
+        let index = callIndex
+        callIndex += 1
+
+        if index < responses.count {
+            switch responses[index] {
+            case .success(let value):
+                return try JSONEncoder().encode(AnyEncodable(value))
+            case .failure(let error):
+                throw error
+            }
+        }
+        // Repeat last response if available
+        if let last = responses.last {
+            switch last {
+            case .success(let value):
+                return try JSONEncoder().encode(AnyEncodable(value))
+            case .failure(let error):
+                throw error
+            }
+        }
+        throw IPCClientError.invalidResponse
+    }
+}
+
+/// Type-erased Encodable wrapper.
+private struct AnyEncodable: Encodable {
+    private let _encode: (Encoder) throws -> Void
+
+    init(_ value: any Encodable) {
+        _encode = { encoder in
+            try value.encode(to: encoder)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try _encode(encoder)
+    }
+}
