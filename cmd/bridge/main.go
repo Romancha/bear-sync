@@ -54,23 +54,23 @@ type config struct {
 
 func loadConfig() (*config, error) {
 	cfg := &config{
-		hubURL:    os.Getenv("BRIDGE_HUB_URL"),
-		hubToken:  os.Getenv("BRIDGE_HUB_TOKEN"),
-		bearToken: os.Getenv("BEAR_TOKEN"),
-		statePath: os.Getenv("BRIDGE_STATE_PATH"),
-		bearDBDir: os.Getenv("BEAR_DB_DIR"),
+		hubURL:    os.Getenv("SALMON_HUB_URL"),
+		hubToken:  os.Getenv("SALMON_HUB_TOKEN"),
+		bearToken: os.Getenv("SALMON_BEAR_TOKEN"),
+		statePath: os.Getenv("SALMON_STATE_PATH"),
+		bearDBDir: os.Getenv("SALMON_BEAR_DB_DIR"),
 	}
 
 	if cfg.hubURL == "" {
-		return nil, fmt.Errorf("BRIDGE_HUB_URL is required")
+		return nil, fmt.Errorf("SALMON_HUB_URL is required")
 	}
 
 	if cfg.hubToken == "" {
-		return nil, fmt.Errorf("BRIDGE_HUB_TOKEN is required")
+		return nil, fmt.Errorf("SALMON_HUB_TOKEN is required")
 	}
 
 	if cfg.bearToken == "" {
-		return nil, fmt.Errorf("BEAR_TOKEN is required")
+		return nil, fmt.Errorf("SALMON_BEAR_TOKEN is required")
 	}
 
 	if cfg.statePath == "" {
@@ -78,7 +78,7 @@ func loadConfig() (*config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("get home dir: %w", err)
 		}
-		cfg.statePath = home + "/.bear-bridge-state.json"
+		cfg.statePath = home + "/.salmon-state.json"
 	}
 
 	if cfg.bearDBDir == "" {
@@ -89,21 +89,21 @@ func loadConfig() (*config, error) {
 		cfg.bearDBDir = home + "/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data"
 	}
 
-	if v := os.Getenv("BRIDGE_IPC_SOCKET"); v != "" {
+	if v := os.Getenv("SALMON_IPC_SOCKET"); v != "" {
 		cfg.ipcSocket = v
 	} else {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return nil, fmt.Errorf("get home dir: %w", err)
 		}
-		cfg.ipcSocket = home + "/.bear-bridge.sock"
+		cfg.ipcSocket = home + "/.salmon.sock"
 	}
 
 	cfg.syncInterval = defaultSyncInterval
-	if v := os.Getenv("BRIDGE_SYNC_INTERVAL"); v != "" {
+	if v := os.Getenv("SALMON_SYNC_INTERVAL"); v != "" {
 		secs, err := strconv.Atoi(v)
 		if err != nil || secs < 1 {
-			return nil, fmt.Errorf("BRIDGE_SYNC_INTERVAL must be a positive integer (seconds), got %q", v)
+			return nil, fmt.Errorf("SALMON_SYNC_INTERVAL must be a positive integer (seconds), got %q", v)
 		}
 		cfg.syncInterval = time.Duration(secs) * time.Second
 	}
@@ -172,9 +172,9 @@ func run(logger *slog.Logger, daemonMode bool) error {
 func lockFilePath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "/tmp/.bear-bridge.lock"
+		return "/tmp/.salmon.lock"
 	}
-	return home + "/.bear-bridge.lock"
+	return home + "/.salmon.lock"
 }
 
 // acquireLock attempts to acquire an exclusive non-blocking file lock.

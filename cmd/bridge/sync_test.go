@@ -758,21 +758,21 @@ func TestMergeNoteTags(t *testing.T) {
 
 func TestLoadConfig_MissingRequired(t *testing.T) {
 	// Clear all env vars.
-	t.Setenv("BRIDGE_HUB_URL", "")
-	t.Setenv("BRIDGE_HUB_TOKEN", "")
-	t.Setenv("BEAR_TOKEN", "")
+	t.Setenv("SALMON_HUB_URL", "")
+	t.Setenv("SALMON_HUB_TOKEN", "")
+	t.Setenv("SALMON_BEAR_TOKEN", "")
 
 	_, err := loadConfig()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "BRIDGE_HUB_URL")
+	assert.Contains(t, err.Error(), "SALMON_HUB_URL")
 }
 
 func TestLoadConfig_AllSet(t *testing.T) {
-	t.Setenv("BRIDGE_HUB_URL", "http://localhost:8080")
-	t.Setenv("BRIDGE_HUB_TOKEN", "test-token")
-	t.Setenv("BEAR_TOKEN", "bear-token")
-	t.Setenv("BRIDGE_STATE_PATH", "/tmp/test-state.json")
-	t.Setenv("BEAR_DB_DIR", "/tmp/test-bear-db")
+	t.Setenv("SALMON_HUB_URL", "http://localhost:8080")
+	t.Setenv("SALMON_HUB_TOKEN", "test-token")
+	t.Setenv("SALMON_BEAR_TOKEN", "bear-token")
+	t.Setenv("SALMON_STATE_PATH", "/tmp/test-state.json")
+	t.Setenv("SALMON_BEAR_DB_DIR", "/tmp/test-bear-db")
 
 	cfg, err := loadConfig()
 	require.NoError(t, err)

@@ -50,12 +50,12 @@ Full rebranding of the project from bear-sync/bear-bridge/BearBridge to Salmon-t
 - [x] Run `make test` - must pass before next task
 
 ### Task 2: Rename environment variables
-- [ ] In `cmd/bridge/main.go`: rename all `BRIDGE_*` env vars to `SALMON_*`
-- [ ] In `cmd/hub/main.go`: rename `HUB_*` env vars to `SALMON_HUB_*` where appropriate
-- [ ] Update default file paths: `.bear-bridge-state.json` -> `.salmon-state.json`, `.bear-bridge.sock` -> `.salmon.sock`, `.bear-bridge.lock` -> `.salmon.lock`
-- [ ] Update `.gitignore` entries for new file names
-- [ ] Update any tests referencing old env var names or file paths
-- [ ] Run `make test` - must pass before next task
+- [x] In `cmd/bridge/main.go`: rename all `BRIDGE_*` env vars to `SALMON_*`
+- [x] In `cmd/hub/main.go`: rename `HUB_*` env vars to `SALMON_HUB_*` where appropriate
+- [x] Update default file paths: `.bear-bridge-state.json` -> `.salmon-state.json`, `.bear-bridge.sock` -> `.salmon.sock`, `.bear-bridge.lock` -> `.salmon.lock`
+- [x] Update `.gitignore` entries for new file names
+- [x] Update any tests referencing old env var names or file paths
+- [x] Run `make test` - must pass before next task
 
 ### Task 3: Rename binary names in Makefile and build system
 - [ ] In `Makefile`: `BINARY_HUB=bear-sync-hub` -> `BINARY_HUB=salmon-hub`

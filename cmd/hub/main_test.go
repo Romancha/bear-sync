@@ -8,12 +8,12 @@ import (
 )
 
 func TestLoadConfig_MissingRequired(t *testing.T) {
-	for _, key := range []string{"HUB_DB_PATH", "HUB_CONSUMER_TOKENS", "HUB_BRIDGE_TOKEN"} {
+	for _, key := range []string{"SALMON_HUB_DB_PATH", "SALMON_HUB_CONSUMER_TOKENS", "SALMON_HUB_BRIDGE_TOKEN"} {
 		t.Run(key, func(t *testing.T) {
 			required := map[string]string{ //nolint:gosec // test credentials
-				"HUB_DB_PATH":         "/tmp/test.db",
-				"HUB_CONSUMER_TOKENS": "app1:oc-test",
-				"HUB_BRIDGE_TOKEN":    "br-test",
+				"SALMON_HUB_DB_PATH":         "/tmp/test.db",
+				"SALMON_HUB_CONSUMER_TOKENS": "app1:oc-test",
+				"SALMON_HUB_BRIDGE_TOKEN":    "br-test",
 			}
 			for k, v := range required {
 				if k != key {
@@ -28,9 +28,9 @@ func TestLoadConfig_MissingRequired(t *testing.T) {
 }
 
 func TestLoadConfig_Defaults(t *testing.T) {
-	t.Setenv("HUB_DB_PATH", "/tmp/test.db")
-	t.Setenv("HUB_CONSUMER_TOKENS", "app1:oc-test")
-	t.Setenv("HUB_BRIDGE_TOKEN", "br-test")
+	t.Setenv("SALMON_HUB_DB_PATH", "/tmp/test.db")
+	t.Setenv("SALMON_HUB_CONSUMER_TOKENS", "app1:oc-test")
+	t.Setenv("SALMON_HUB_BRIDGE_TOKEN", "br-test")
 
 	cfg, err := loadConfig()
 	require.NoError(t, err)
@@ -42,9 +42,9 @@ func TestLoadConfig_Defaults(t *testing.T) {
 }
 
 func TestLoadConfig_MultipleConsumers(t *testing.T) {
-	t.Setenv("HUB_DB_PATH", "/tmp/test.db")
-	t.Setenv("HUB_CONSUMER_TOKENS", "app1:oc-test,myapp:my-test")
-	t.Setenv("HUB_BRIDGE_TOKEN", "br-test")
+	t.Setenv("SALMON_HUB_DB_PATH", "/tmp/test.db")
+	t.Setenv("SALMON_HUB_CONSUMER_TOKENS", "app1:oc-test,myapp:my-test")
+	t.Setenv("SALMON_HUB_BRIDGE_TOKEN", "br-test")
 
 	cfg, err := loadConfig()
 	require.NoError(t, err)
@@ -55,31 +55,31 @@ func TestLoadConfig_MultipleConsumers(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidConsumerTokensFormat(t *testing.T) {
-	t.Setenv("HUB_DB_PATH", "/tmp/test.db")
-	t.Setenv("HUB_CONSUMER_TOKENS", "bad-format-no-colon")
-	t.Setenv("HUB_BRIDGE_TOKEN", "br-test")
+	t.Setenv("SALMON_HUB_DB_PATH", "/tmp/test.db")
+	t.Setenv("SALMON_HUB_CONSUMER_TOKENS", "bad-format-no-colon")
+	t.Setenv("SALMON_HUB_BRIDGE_TOKEN", "br-test")
 
 	_, err := loadConfig()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "parse HUB_CONSUMER_TOKENS")
+	assert.Contains(t, err.Error(), "parse SALMON_HUB_CONSUMER_TOKENS")
 }
 
 func TestLoadConfig_ConsumerTokenEqualsBridgeToken(t *testing.T) {
-	t.Setenv("HUB_DB_PATH", "/tmp/test.db")
-	t.Setenv("HUB_CONSUMER_TOKENS", "app1:same-secret")
-	t.Setenv("HUB_BRIDGE_TOKEN", "same-secret")
+	t.Setenv("SALMON_HUB_DB_PATH", "/tmp/test.db")
+	t.Setenv("SALMON_HUB_CONSUMER_TOKENS", "app1:same-secret")
+	t.Setenv("SALMON_HUB_BRIDGE_TOKEN", "same-secret")
 
 	_, err := loadConfig()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must not equal HUB_BRIDGE_TOKEN")
+	assert.Contains(t, err.Error(), "must not equal SALMON_HUB_BRIDGE_TOKEN")
 }
 
 func TestLoadConfig_CustomValues(t *testing.T) {
-	t.Setenv("HUB_DB_PATH", "/tmp/hub.db")
-	t.Setenv("HUB_CONSUMER_TOKENS", "app1:oc-test")
-	t.Setenv("HUB_BRIDGE_TOKEN", "br-test")
-	t.Setenv("HUB_PORT", "9090")
-	t.Setenv("HUB_ATTACHMENTS_DIR", "/tmp/att")
+	t.Setenv("SALMON_HUB_DB_PATH", "/tmp/hub.db")
+	t.Setenv("SALMON_HUB_CONSUMER_TOKENS", "app1:oc-test")
+	t.Setenv("SALMON_HUB_BRIDGE_TOKEN", "br-test")
+	t.Setenv("SALMON_HUB_PORT", "9090")
+	t.Setenv("SALMON_HUB_ATTACHMENTS_DIR", "/tmp/att")
 
 	cfg, err := loadConfig()
 	require.NoError(t, err)

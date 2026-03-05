@@ -44,11 +44,11 @@ type config struct {
 
 func loadConfig() (*config, error) {
 	cfg := &config{
-		host:           os.Getenv("HUB_HOST"),
-		port:           os.Getenv("HUB_PORT"),
-		dbPath:         os.Getenv("HUB_DB_PATH"),
-		bridgeToken:    os.Getenv("HUB_BRIDGE_TOKEN"),
-		attachmentsDir: os.Getenv("HUB_ATTACHMENTS_DIR"),
+		host:           os.Getenv("SALMON_HUB_HOST"),
+		port:           os.Getenv("SALMON_HUB_PORT"),
+		dbPath:         os.Getenv("SALMON_HUB_DB_PATH"),
+		bridgeToken:    os.Getenv("SALMON_HUB_BRIDGE_TOKEN"),
+		attachmentsDir: os.Getenv("SALMON_HUB_ATTACHMENTS_DIR"),
 	}
 
 	if cfg.host == "" {
@@ -60,28 +60,28 @@ func loadConfig() (*config, error) {
 	}
 
 	if cfg.dbPath == "" {
-		return nil, fmt.Errorf("HUB_DB_PATH is required")
+		return nil, fmt.Errorf("SALMON_HUB_DB_PATH is required")
 	}
 
-	rawTokens := os.Getenv("HUB_CONSUMER_TOKENS")
+	rawTokens := os.Getenv("SALMON_HUB_CONSUMER_TOKENS")
 	if rawTokens == "" {
-		return nil, fmt.Errorf("HUB_CONSUMER_TOKENS is required")
+		return nil, fmt.Errorf("SALMON_HUB_CONSUMER_TOKENS is required")
 	}
 
 	consumerTokens, err := api.ParseConsumerTokens(rawTokens)
 	if err != nil {
-		return nil, fmt.Errorf("parse HUB_CONSUMER_TOKENS: %w", err)
+		return nil, fmt.Errorf("parse SALMON_HUB_CONSUMER_TOKENS: %w", err)
 	}
 
 	cfg.consumerTokens = consumerTokens
 
 	if cfg.bridgeToken == "" {
-		return nil, fmt.Errorf("HUB_BRIDGE_TOKEN is required")
+		return nil, fmt.Errorf("SALMON_HUB_BRIDGE_TOKEN is required")
 	}
 
 	for name, token := range cfg.consumerTokens {
 		if token == cfg.bridgeToken {
-			return nil, fmt.Errorf("consumer %q token must not equal HUB_BRIDGE_TOKEN", name)
+			return nil, fmt.Errorf("consumer %q token must not equal SALMON_HUB_BRIDGE_TOKEN", name)
 		}
 	}
 

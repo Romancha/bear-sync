@@ -4,8 +4,8 @@ coverage.html
 *.db
 *.db-wal
 *.db-shm
-.bear-bridge-state.json
-.bear-bridge.lock
+.salmon-state.json
+.salmon.lock
 .env
 .idea/
 

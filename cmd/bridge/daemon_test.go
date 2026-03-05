@@ -114,10 +114,10 @@ func TestRunDaemon_GracefulShutdown(t *testing.T) {
 }
 
 func TestLoadConfig_SyncInterval_Default(t *testing.T) {
-	t.Setenv("BRIDGE_HUB_URL", "http://localhost:8080")
-	t.Setenv("BRIDGE_HUB_TOKEN", "test-token")
-	t.Setenv("BEAR_TOKEN", "bear-token")
-	t.Setenv("BRIDGE_SYNC_INTERVAL", "")
+	t.Setenv("SALMON_HUB_URL", "http://localhost:8080")
+	t.Setenv("SALMON_HUB_TOKEN", "test-token")
+	t.Setenv("SALMON_BEAR_TOKEN", "bear-token")
+	t.Setenv("SALMON_SYNC_INTERVAL", "")
 
 	cfg, err := loadConfig()
 	require.NoError(t, err)
@@ -125,10 +125,10 @@ func TestLoadConfig_SyncInterval_Default(t *testing.T) {
 }
 
 func TestLoadConfig_SyncInterval_Custom(t *testing.T) {
-	t.Setenv("BRIDGE_HUB_URL", "http://localhost:8080")
-	t.Setenv("BRIDGE_HUB_TOKEN", "test-token")
-	t.Setenv("BEAR_TOKEN", "bear-token")
-	t.Setenv("BRIDGE_SYNC_INTERVAL", "60")
+	t.Setenv("SALMON_HUB_URL", "http://localhost:8080")
+	t.Setenv("SALMON_HUB_TOKEN", "test-token")
+	t.Setenv("SALMON_BEAR_TOKEN", "bear-token")
+	t.Setenv("SALMON_SYNC_INTERVAL", "60")
 
 	cfg, err := loadConfig()
 	require.NoError(t, err)
@@ -136,9 +136,9 @@ func TestLoadConfig_SyncInterval_Custom(t *testing.T) {
 }
 
 func TestLoadConfig_SyncInterval_Invalid(t *testing.T) {
-	t.Setenv("BRIDGE_HUB_URL", "http://localhost:8080")
-	t.Setenv("BRIDGE_HUB_TOKEN", "test-token")
-	t.Setenv("BEAR_TOKEN", "bear-token")
+	t.Setenv("SALMON_HUB_URL", "http://localhost:8080")
+	t.Setenv("SALMON_HUB_TOKEN", "test-token")
+	t.Setenv("SALMON_BEAR_TOKEN", "bear-token")
 
 	tests := []struct {
 		name  string
@@ -151,10 +151,10 @@ func TestLoadConfig_SyncInterval_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("BRIDGE_SYNC_INTERVAL", tt.value)
+			t.Setenv("SALMON_SYNC_INTERVAL", tt.value)
 			_, err := loadConfig()
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "BRIDGE_SYNC_INTERVAL")
+			assert.Contains(t, err.Error(), "SALMON_SYNC_INTERVAL")
 		})
 	}
 }
