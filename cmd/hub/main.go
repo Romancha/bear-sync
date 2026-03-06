@@ -138,7 +138,7 @@ func run() error {
 	slog.Info("registered consumers", "consumers", strings.Join(consumerNames, ", "))
 
 	go func() {
-		slog.Info("starting hub server", "addr", addr)
+		slog.Info("starting hub server", "addr", addr) //nolint:gosec // G706: addr from trusted env var, slog structured logging
 
 		if listenErr := httpServer.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("listen: %w", listenErr)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // BridgeState holds the persistent state of the bridge between sync cycles.
@@ -45,6 +46,8 @@ func loadState(path string) (*BridgeState, error) {
 
 // saveState writes the bridge state to disk atomically (write to temp, then rename).
 func saveState(path string, state *BridgeState) error {
+	path = filepath.Clean(path)
+
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal state: %w", err)

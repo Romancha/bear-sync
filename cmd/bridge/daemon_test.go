@@ -23,7 +23,7 @@ func TestRunDaemon_RunsInitialSyncAndStops(t *testing.T) {
 	hub := &mockHubClient{}
 	bridge := newTestBridge(db, hub, statePath)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel called in goroutine below
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
@@ -47,7 +47,7 @@ func TestRunDaemon_RunsMultipleCycles(t *testing.T) {
 	hub := &mockHubClient{}
 	bridge := newTestBridge(db, hub, statePath)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel called in goroutine below
 	go func() {
 		time.Sleep(250 * time.Millisecond)
 		cancel()
@@ -70,7 +70,7 @@ func TestRunDaemon_ContinuesOnSyncError(t *testing.T) {
 	hub := &mockHubClient{}
 	bridge := newTestBridge(db, hub, statePath)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel called in goroutine below
 	go func() {
 		time.Sleep(250 * time.Millisecond)
 		cancel()
@@ -92,7 +92,7 @@ func TestRunDaemon_GracefulShutdown(t *testing.T) {
 	hub := &mockHubClient{}
 	bridge := newTestBridge(db, hub, statePath)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel called below after sleep
 
 	done := make(chan error, 1)
 	go func() {

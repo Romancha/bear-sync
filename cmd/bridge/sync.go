@@ -54,8 +54,8 @@ func NewBridge(
 		hub:         hub,
 		xcall:       xcall,
 		bearToken:   bearToken,
-		statePath:   statePath,
-		bearDataDir: bearDataDir,
+		statePath:   filepath.Clean(statePath),
+		bearDataDir: filepath.Clean(bearDataDir),
 		logger:      logger,
 		sleepFn:     time.Sleep,
 	}
