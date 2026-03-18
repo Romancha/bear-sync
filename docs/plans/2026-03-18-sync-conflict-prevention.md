@@ -78,14 +78,14 @@ Hub:      modified_at changed + pending_to_bear → detectContentConflict → FA
 - [x] run tests — must pass before next task
 
 ### Task 2: Bridge reports `BearModifiedAt` in ack
-- [ ] write test in `cmd/bridge/queue_test.go`: `applyUpdate` ack includes `BearModifiedAt` read from Bear SQLite after apply
-- [ ] write test: `applyCreate` ack includes `BearModifiedAt` read from Bear SQLite after create
-- [ ] write test: if Bear SQLite read fails after apply, `BearModifiedAt` is empty (graceful degradation)
-- [ ] add `BearModifiedAt string` field to `models.SyncAckItem` in `internal/models/sync.go` (`json:"bear_modified_at,omitempty"`)
-- [ ] in `cmd/bridge/queue.go` `applyUpdate` (line ~314-327): after verify sleep, read `updated.ModifiedAt` and return it via a new return value or set on ack
-- [ ] in `cmd/bridge/queue.go` `applyCreate` (line ~244-256): after verify, read note's `ModifiedAt` from Bear SQLite and include in ack
-- [ ] update `applyQueueItem` to pass `BearModifiedAt` from apply result to the `SyncAckItem`
-- [ ] run tests — must pass before next task
+- [x] write test in `cmd/bridge/queue_test.go`: `applyUpdate` ack includes `BearModifiedAt` read from Bear SQLite after apply
+- [x] write test: `applyCreate` ack includes `BearModifiedAt` read from Bear SQLite after create
+- [x] write test: if Bear SQLite read fails after apply, `BearModifiedAt` is empty (graceful degradation)
+- [x] add `BearModifiedAt string` field to `models.SyncAckItem` in `internal/models/sync.go` (`json:"bear_modified_at,omitempty"`)
+- [x] in `cmd/bridge/queue.go` `applyUpdate` (line ~314-327): after verify sleep, read `updated.ModifiedAt` and return it via a new return value or set on ack
+- [x] in `cmd/bridge/queue.go` `applyCreate` (line ~244-256): after verify, read note's `ModifiedAt` from Bear SQLite and include in ack
+- [x] update `applyQueueItem` to pass `BearModifiedAt` from apply result to the `SyncAckItem`
+- [x] run tests — must pass before next task
 
 ### Task 3: Hub stores `expected_bear_modified_at` on ack
 - [ ] write test in `internal/store/sqlite_test.go`: when `AckQueueItems` receives ack with `BearModifiedAt`, the note's `expected_bear_modified_at` is set to that value

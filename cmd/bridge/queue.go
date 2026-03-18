@@ -10,6 +10,7 @@ import (
 
 	"github.com/romancha/salmon/internal/beardb"
 	"github.com/romancha/salmon/internal/ipc"
+	"github.com/romancha/salmon/internal/mapper"
 	"github.com/romancha/salmon/internal/models"
 	"github.com/romancha/salmon/internal/xcallback"
 )
@@ -127,9 +128,9 @@ func (b *Bridge) applyQueueItem(ctx context.Context, item *models.WriteQueueItem
 
 	switch item.Action {
 	case "create": //nolint:goconst // action string literal used in switch
-		ack.BearID, err = b.applyCreate(ctx, item)
+		ack.BearID, ack.BearModifiedAt, err = b.applyCreate(ctx, item)
 	case "update":
-		err = b.applyUpdate(ctx, item)
+		ack.BearModifiedAt, err = b.applyUpdate(ctx, item)
 	case "add_tag":
 		err = b.applyAddTag(ctx, item)
 	case "trash":
@@ -225,20 +226,22 @@ func (b *Bridge) extractConflictContent(ctx context.Context, item *models.WriteQ
 	return title, body
 }
 
-// applyCreate creates a new note in Bear via bear-xcall and returns the bear_id.
-func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (string, error) {
+// applyCreate creates a new note in Bear via bear-xcall and returns the bear_id and bear's modified_at.
+func (b *Bridge) applyCreate(
+	ctx context.Context, item *models.WriteQueueItem,
+) (retBearID, retBearModifiedAt string, retErr error) {
 	var payload createPayload
 	if err := json.Unmarshal([]byte(item.Payload), &payload); err != nil {
-		return "", fmt.Errorf("parse create payload: %w", err)
+		return "", "", fmt.Errorf("parse create payload: %w", err)
 	}
 
 	if len(payload.Body) > maxXCallbackBodySize {
-		return "", fmt.Errorf("note body too large for x-callback-url (%d bytes, limit %d)", len(payload.Body), maxXCallbackBodySize)
+		return "", "", fmt.Errorf("note body too large for x-callback-url (%d bytes, limit %d)", len(payload.Body), maxXCallbackBodySize)
 	}
 
 	bearID, err := b.xcall.Create(ctx, b.bearToken, payload.Title, payload.Body, payload.Tags)
 	if err != nil {
-		return "", fmt.Errorf("bear-xcall create: %w", err)
+		return "", "", fmt.Errorf("bear-xcall create: %w", err)
 	}
 
 	if bearID != "" {
@@ -252,7 +255,7 @@ func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (
 			b.logger.Warn("create verification: note not found in Bear SQLite yet", "bear_id", bearID)
 		}
 
-		return bearID, nil
+		return bearID, bearModifiedAtFromNote(note), nil
 	}
 
 	// Fallback verification: bear-xcall didn't return a UUID.
@@ -265,50 +268,50 @@ func (b *Bridge) applyCreate(ctx context.Context, item *models.WriteQueueItem) (
 	b.sleepFn(verifyDelay)
 	matches, err := b.db.FindRecentNotesByTitle(ctx, payload.Title, createdAfter)
 	if err != nil {
-		return "", fmt.Errorf("fallback search: %w", err)
+		return "", "", fmt.Errorf("fallback search: %w", err)
 	}
 
 	switch len(matches) {
 	case 0:
-		return "", fmt.Errorf("create fallback: note not found in Bear after creation")
+		return "", "", fmt.Errorf("create fallback: note not found in Bear after creation")
 	case 1:
-		return matches[0].UUID, nil
+		return matches[0].UUID, bearModifiedAtFromNote(&matches[0]), nil
 	default:
-		return "", fmt.Errorf("create fallback: ambiguous, found %d notes with title %q", len(matches), payload.Title)
+		return "", "", fmt.Errorf("create fallback: ambiguous, found %d notes with title %q", len(matches), payload.Title)
 	}
 }
 
-// applyUpdate updates a note body in Bear via bear-xcall.
-func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) error {
+// applyUpdate updates a note body in Bear via bear-xcall. Returns Bear's modified_at after apply.
+func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) (string, error) {
 	var payload updatePayload
 	if err := json.Unmarshal([]byte(item.Payload), &payload); err != nil {
-		return fmt.Errorf("parse update payload: %w", err)
+		return "", fmt.Errorf("parse update payload: %w", err)
 	}
 
 	// Look up bear_id for this note. The item.NoteID is the hub UUID,
 	// but we need the Bear UUID for bear-xcall. Check if note already has the desired content.
 	note, err := b.findBearNoteForItem(ctx, item)
 	if err != nil {
-		return fmt.Errorf("find bear note: %w", err)
+		return "", fmt.Errorf("find bear note: %w", err)
 	}
 
 	// Duplicate-safe: check if note already has the desired body.
 	if payload.Body != "" && note.Body == payload.Body {
 		b.logger.Info("update already applied (body matches)", "bear_id", note.UUID)
-		return nil
+		return "", nil
 	}
 
 	body := payload.Body
 	if body == "" {
-		return fmt.Errorf("update payload has no body")
+		return "", fmt.Errorf("update payload has no body")
 	}
 
 	if len(body) > maxXCallbackBodySize {
-		return fmt.Errorf("note body too large for x-callback-url (%d bytes, limit %d)", len(body), maxXCallbackBodySize)
+		return "", fmt.Errorf("note body too large for x-callback-url (%d bytes, limit %d)", len(body), maxXCallbackBodySize)
 	}
 
 	if err := b.xcall.Update(ctx, b.bearToken, note.UUID, body); err != nil {
-		return fmt.Errorf("bear-xcall update: %w", err)
+		return "", fmt.Errorf("bear-xcall update: %w", err)
 	}
 
 	// Verify update.
@@ -317,14 +320,14 @@ func (b *Bridge) applyUpdate(ctx context.Context, item *models.WriteQueueItem) e
 	updated, err := b.db.NoteByUUID(ctx, note.UUID)
 	if err != nil {
 		b.logger.Warn("update verification query failed", "bear_id", note.UUID, "error", err)
-		return nil // bear-xcall succeeded, verification is best-effort
+		return "", nil // bear-xcall succeeded, verification is best-effort
 	}
 
 	if updated != nil && updated.Body != body {
 		b.logger.Warn("update verification: body mismatch after update", "bear_id", note.UUID)
 	}
 
-	return nil
+	return bearModifiedAtFromNote(updated), nil
 }
 
 // applyAddTag adds a tag to a note in Bear via bear-xcall.
@@ -574,6 +577,15 @@ func (b *Bridge) applyDeleteTag(ctx context.Context, item *models.WriteQueueItem
 	b.logger.Info("bear-xcall delete-tag succeeded", "tag_name", payload.Name)
 
 	return nil
+}
+
+// bearModifiedAtFromNote converts a NoteBasicInfo's ModifiedAt to the RFC3339 string format used by the hub.
+// Returns empty string if note is nil or ModifiedAt is zero.
+func bearModifiedAtFromNote(note *beardb.NoteBasicInfo) string {
+	if note == nil || note.ModifiedAt == 0 {
+		return ""
+	}
+	return mapper.ConvertCoreDataDate(&note.ModifiedAt)
 }
 
 // countByStatus counts ack items with the given status.

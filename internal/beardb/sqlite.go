@@ -347,11 +347,12 @@ func (s *SQLiteBearDB) NoteByUUID(ctx context.Context, bearUUID string) (*NoteBa
 	var info NoteBasicInfo
 	var title, body sql.NullString
 	var trashed, archived sql.NullInt64
+	var modifiedAt sql.NullFloat64
 
 	err := s.db.QueryRowContext(ctx,
-		"SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT, ZTRASHED, ZARCHIVED FROM ZSFNOTE WHERE ZUNIQUEIDENTIFIER = ?",
+		"SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT, ZMODIFICATIONDATE, ZTRASHED, ZARCHIVED FROM ZSFNOTE WHERE ZUNIQUEIDENTIFIER = ?",
 		bearUUID,
-	).Scan(&info.UUID, &title, &body, &trashed, &archived)
+	).Scan(&info.UUID, &title, &body, &modifiedAt, &trashed, &archived)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -364,6 +365,9 @@ func (s *SQLiteBearDB) NoteByUUID(ctx context.Context, bearUUID string) (*NoteBa
 	}
 	if body.Valid {
 		info.Body = body.String
+	}
+	if modifiedAt.Valid {
+		info.ModifiedAt = modifiedAt.Float64
 	}
 	if trashed.Valid {
 		info.Trashed = trashed.Int64
@@ -439,7 +443,7 @@ func (s *SQLiteBearDB) FindRecentNotesByTitle(
 	ctx context.Context, title string, createdAfter float64,
 ) ([]NoteBasicInfo, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT, ZTRASHED FROM ZSFNOTE"+
+		"SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT, ZMODIFICATIONDATE, ZTRASHED FROM ZSFNOTE"+
 			" WHERE ZTITLE = ? AND ZCREATIONDATE > ?",
 		title, createdAfter,
 	)
@@ -452,9 +456,10 @@ func (s *SQLiteBearDB) FindRecentNotesByTitle(
 	for rows.Next() {
 		var info NoteBasicInfo
 		var noteTitle, body sql.NullString
+		var modifiedAt sql.NullFloat64
 		var trashed sql.NullInt64
 
-		if err := rows.Scan(&info.UUID, &noteTitle, &body, &trashed); err != nil {
+		if err := rows.Scan(&info.UUID, &noteTitle, &body, &modifiedAt, &trashed); err != nil {
 			return nil, fmt.Errorf("scan recent note: %w", err)
 		}
 		if noteTitle.Valid {
@@ -462,6 +467,9 @@ func (s *SQLiteBearDB) FindRecentNotesByTitle(
 		}
 		if body.Valid {
 			info.Body = body.String
+		}
+		if modifiedAt.Valid {
+			info.ModifiedAt = modifiedAt.Float64
 		}
 		if trashed.Valid {
 			info.Trashed = trashed.Int64

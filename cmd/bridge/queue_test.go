@@ -1126,6 +1126,111 @@ func TestProcessQueue_DeleteTagInvalidPayload(t *testing.T) {
 	assert.Contains(t, hub.ackItems[0].Error, "parse delete_tag payload")
 }
 
+// --- BearModifiedAt in ack tests ---
+
+func TestProcessQueue_UpdateAckIncludesBearModifiedAt(t *testing.T) {
+	db := &mockBearDB{
+		notesByUUID: map[string]*beardb.NoteBasicInfo{
+			"bear-note-1": {UUID: "bear-note-1", Title: "Note", Body: "old body", ModifiedAt: 726842700.5},
+		},
+	}
+	hub := &mockHubClient{
+		queueItems: []models.WriteQueueItem{
+			{
+				ID:             80,
+				IdempotencyKey: "idem-80",
+				Action:         "update",
+				NoteID:         "bear-note-1",
+				Payload:        `{"body":"new body"}`,
+			},
+		},
+	}
+	xcall := &mockXCallback{}
+	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
+
+	err := bridge.processQueue(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, hub.ackItems, 1)
+	assert.Equal(t, "applied", hub.ackItems[0].Status)
+	// The mock returns the same note on re-read (NoteByUUID), so BearModifiedAt reflects its ModifiedAt.
+	assert.NotEmpty(t, hub.ackItems[0].BearModifiedAt)
+	assert.Equal(t, "2024-01-13T12:45:00Z", hub.ackItems[0].BearModifiedAt)
+}
+
+func TestProcessQueue_CreateAckIncludesBearModifiedAt(t *testing.T) {
+	db := &mockBearDB{
+		notesByUUID: map[string]*beardb.NoteBasicInfo{
+			"bear-uuid-1": {UUID: "bear-uuid-1", Title: "New Note", Body: "Hello", ModifiedAt: 726842700.0},
+		},
+	}
+	hub := &mockHubClient{
+		queueItems: []models.WriteQueueItem{
+			{
+				ID:             81,
+				IdempotencyKey: "idem-81",
+				Action:         "create",
+				NoteID:         "hub-uuid-1",
+				Payload:        `{"title":"New Note","body":"Hello","tags":["tag1"]}`,
+			},
+		},
+	}
+	xcall := &mockXCallback{createBearID: "bear-uuid-1"}
+	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
+
+	err := bridge.processQueue(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, hub.ackItems, 1)
+	assert.Equal(t, "applied", hub.ackItems[0].Status)
+	assert.Equal(t, "bear-uuid-1", hub.ackItems[0].BearID)
+	assert.NotEmpty(t, hub.ackItems[0].BearModifiedAt)
+}
+
+func TestProcessQueue_UpdateBearReadFailsGracefulDegradation(t *testing.T) {
+	// First call to NoteByUUID succeeds (for findBearNoteForItem), but we test the scenario
+	// where the verification read returns nil (note not found after apply).
+	db := &mockBearDB{
+		notesByUUID: map[string]*beardb.NoteBasicInfo{
+			"bear-note-1": {UUID: "bear-note-1", Title: "Note", Body: "old body", ModifiedAt: 726842700.0},
+		},
+	}
+	hub := &mockHubClient{
+		queueItems: []models.WriteQueueItem{
+			{
+				ID:             82,
+				IdempotencyKey: "idem-82",
+				Action:         "update",
+				NoteID:         "bear-note-1",
+				Payload:        `{"body":"new body"}`,
+			},
+		},
+	}
+	xcall := &mockXCallback{}
+	bridge := newQueueBridge(db, hub, xcall, filepath.Join(t.TempDir(), "state.json"))
+
+	// Make the mock return an error on the second call (verification read).
+	callCount := 0
+	origNotes := db.notesByUUID
+	db.noteByUUIDFn = func(_ context.Context, bearUUID string) (*beardb.NoteBasicInfo, error) {
+		callCount++
+		if callCount == 1 {
+			// First call: findBearNoteForItem
+			return origNotes[bearUUID], nil
+		}
+		// Second call: verification read — simulate failure
+		return nil, fmt.Errorf("sqlite busy")
+	}
+
+	err := bridge.processQueue(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, hub.ackItems, 1)
+	assert.Equal(t, "applied", hub.ackItems[0].Status)
+	// BearModifiedAt should be empty due to failed verification read.
+	assert.Empty(t, hub.ackItems[0].BearModifiedAt)
+}
+
 func TestCountByStatus(t *testing.T) {
 	items := []models.SyncAckItem{
 		{Status: "applied"},

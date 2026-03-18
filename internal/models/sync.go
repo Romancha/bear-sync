@@ -34,6 +34,7 @@ type SyncAckItem struct {
 	IdempotencyKey   string `json:"idempotency_key"`
 	Status           string `json:"status"` // applied | failed
 	BearID           string `json:"bear_id,omitempty"`
+	BearModifiedAt   string `json:"bear_modified_at,omitempty"` // Bear's modified_at after apply (for echo detection)
 	Error            string `json:"error,omitempty"`
 	ConflictResolved bool   `json:"conflict_resolved,omitempty"` // true when bridge handled a conflict item
 }

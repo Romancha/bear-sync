@@ -33,10 +33,11 @@ type mockBearDB struct {
 	blUUIDs     []string
 
 	// Verification data for write queue tests.
-	notesByUUID map[string]*beardb.NoteBasicInfo
-	tagsByNote  map[string][]string // bearUUID -> tag titles
-	filesByNote map[string][]string // bearUUID -> attachment filenames
-	recentNotes []beardb.NoteBasicInfo
+	notesByUUID  map[string]*beardb.NoteBasicInfo
+	noteByUUIDFn func(ctx context.Context, bearUUID string) (*beardb.NoteBasicInfo, error) // optional override
+	tagsByNote   map[string][]string                                                       // bearUUID -> tag titles
+	filesByNote  map[string][]string                                                       // bearUUID -> attachment filenames
+	recentNotes  []beardb.NoteBasicInfo
 }
 
 func (m *mockBearDB) Notes(_ context.Context, _ float64) ([]mapper.BearNoteRow, error) {
@@ -97,7 +98,10 @@ func (m *mockBearDB) AllAttachmentUUIDs(_ context.Context) ([]string, error) { r
 func (m *mockBearDB) AllBacklinkUUIDs(_ context.Context) ([]string, error)   { return m.blUUIDs, nil }
 func (m *mockBearDB) Close() error                                           { return nil }
 
-func (m *mockBearDB) NoteByUUID(_ context.Context, bearUUID string) (*beardb.NoteBasicInfo, error) {
+func (m *mockBearDB) NoteByUUID(ctx context.Context, bearUUID string) (*beardb.NoteBasicInfo, error) {
+	if m.noteByUUIDFn != nil {
+		return m.noteByUUIDFn(ctx, bearUUID)
+	}
 	if m.notesByUUID == nil {
 		return nil, nil
 	}
