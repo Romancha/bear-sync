@@ -53,6 +53,10 @@ type Note struct {
 	PendingBearTitle *string `json:"-"`
 	PendingBearBody  *string `json:"-"`
 
+	// Echo detection: Bear's modified_at timestamp after applying a queue item via x-callback-url.
+	// Used to recognize "echo" delta pushes that reflect our own writes, not genuine user edits.
+	ExpectedBearModifiedAt *string `json:"-"`
+
 	// Joined data (populated by queries, not stored directly)
 	Tags      []Tag      `json:"tags,omitempty"`
 	Backlinks []Backlink `json:"backlinks,omitempty"`

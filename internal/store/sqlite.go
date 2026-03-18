@@ -118,7 +118,8 @@ CREATE TABLE IF NOT EXISTS notes (
     hub_modified_at     TEXT,
     bear_raw            TEXT,
     pending_bear_title  TEXT,
-    pending_bear_body   TEXT
+    pending_bear_body   TEXT,
+    expected_bear_modified_at TEXT
 );
 CREATE TABLE IF NOT EXISTS tags (
     id                      TEXT PRIMARY KEY,
@@ -298,6 +299,12 @@ func (s *SQLiteStore) migratePendingBearColumns(ctx context.Context) error {
 	if !strings.Contains(ddl, "pending_bear_body") {
 		if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN pending_bear_body TEXT"); err != nil {
 			return fmt.Errorf("add pending_bear_body column: %w", err)
+		}
+	}
+
+	if !strings.Contains(ddl, "expected_bear_modified_at") {
+		if _, err := s.db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN expected_bear_modified_at TEXT"); err != nil {
+			return fmt.Errorf("add expected_bear_modified_at column: %w", err)
 		}
 	}
 
@@ -512,12 +519,14 @@ func (s *SQLiteStore) CreateNote(ctx context.Context, note *models.Note) error {
 		pinned_at, trashed_at, order_date, conflict_id_date,
 		last_editing_device, conflict_id, encryption_id, encrypted_data,
 		sync_status, hub_modified_at, bear_raw,
-		pending_bear_title, pending_bear_body
+		pending_bear_title, pending_bear_body,
+		expected_bear_modified_at
 	) VALUES (
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, ?, ?, ?, ?
+		?, ?, ?, ?, ?, ?, ?, ?, ?,
+		?
 	)`
 
 	if _, err := s.db.ExecContext(ctx, query, noteValues(note)...); err != nil {
@@ -539,7 +548,8 @@ func (s *SQLiteStore) UpdateNote(ctx context.Context, note *models.Note) error {
 		conflict_id_date = ?, last_editing_device = ?, conflict_id = ?,
 		encryption_id = ?, encrypted_data = ?, sync_status = ?,
 		hub_modified_at = ?, bear_raw = ?,
-		pending_bear_title = ?, pending_bear_body = ?
+		pending_bear_title = ?, pending_bear_body = ?,
+		expected_bear_modified_at = ?
 	WHERE id = ?`
 
 	vals := noteValues(note)
@@ -975,7 +985,8 @@ func updateExistingNote(
 		conflict_id_date = ?, last_editing_device = ?, conflict_id = ?,
 		encryption_id = ?, encrypted_data = ?, sync_status = ?,
 		hub_modified_at = ?, bear_raw = ?,
-		pending_bear_title = ?, pending_bear_body = ?
+		pending_bear_title = ?, pending_bear_body = ?,
+		expected_bear_modified_at = ?
 	WHERE id = ?`
 
 	vals := noteValues(note)
@@ -1029,12 +1040,14 @@ func insertNewNote(ctx context.Context, tx *sql.Tx, note *models.Note) error {
 		pinned_at, trashed_at, order_date, conflict_id_date,
 		last_editing_device, conflict_id, encryption_id, encrypted_data,
 		sync_status, hub_modified_at, bear_raw,
-		pending_bear_title, pending_bear_body
+		pending_bear_title, pending_bear_body,
+		expected_bear_modified_at
 	) VALUES (
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, ?, ?, ?, ?
+		?, ?, ?, ?, ?, ?, ?, ?, ?,
+		?
 	)`
 
 	if _, err := tx.ExecContext(ctx, query, noteValues(note)...); err != nil {
@@ -1745,7 +1758,8 @@ func ackUpdateNoteStatus(ctx context.Context, tx *sql.Tx, item *models.SyncAckIt
 		// and no other consumers have pending writes.
 		if otherPending == 0 {
 			if _, err := tx.ExecContext(ctx,
-				"UPDATE notes SET sync_status = 'synced', pending_bear_title = NULL, pending_bear_body = NULL "+
+				"UPDATE notes SET sync_status = 'synced', "+
+					"pending_bear_title = NULL, pending_bear_body = NULL, expected_bear_modified_at = NULL "+
 					"WHERE id = ? AND sync_status = 'conflict'",
 				noteID,
 			); err != nil {
@@ -1763,7 +1777,7 @@ func ackUpdateNoteStatus(ctx context.Context, tx *sql.Tx, item *models.SyncAckIt
 		} else {
 			if _, err := tx.ExecContext(ctx,
 				"UPDATE notes SET bear_id = ?, sync_status = 'synced', "+
-					"pending_bear_title = NULL, pending_bear_body = NULL "+
+					"pending_bear_title = NULL, pending_bear_body = NULL, expected_bear_modified_at = NULL "+
 					"WHERE id = ? AND sync_status != 'conflict'",
 				item.BearID, noteID,
 			); err != nil {
@@ -1773,7 +1787,8 @@ func ackUpdateNoteStatus(ctx context.Context, tx *sql.Tx, item *models.SyncAckIt
 	default:
 		if otherPending == 0 {
 			if _, err := tx.ExecContext(ctx,
-				"UPDATE notes SET sync_status = 'synced', pending_bear_title = NULL, pending_bear_body = NULL "+
+				"UPDATE notes SET sync_status = 'synced', "+
+					"pending_bear_title = NULL, pending_bear_body = NULL, expected_bear_modified_at = NULL "+
 					"WHERE id = ? AND sync_status != 'conflict'",
 				noteID,
 			); err != nil {

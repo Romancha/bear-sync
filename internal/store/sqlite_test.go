@@ -1598,3 +1598,140 @@ func TestAckConflictResolved_ClearsPendingBearFields(t *testing.T) {
 	assert.Nil(t, note.PendingBearTitle, "PendingBearTitle should be NULL after conflict resolved")
 	assert.Nil(t, note.PendingBearBody, "PendingBearBody should be NULL after conflict resolved")
 }
+
+// --- ExpectedBearModifiedAt column tests ---
+
+func TestExpectedBearModifiedAt_MigrationAddsColumn(t *testing.T) {
+	// Create a DB with old schema (no expected_bear_modified_at column).
+	dbPath := filepath.Join(t.TempDir(), "test-ebma-migration.db")
+	ctx := context.Background()
+
+	db, err := sql.Open("sqlite", dbPath)
+	require.NoError(t, err)
+
+	// Create notes table without expected_bear_modified_at.
+	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS notes (
+		rowid               INTEGER PRIMARY KEY AUTOINCREMENT,
+		id                  TEXT NOT NULL UNIQUE,
+		bear_id             TEXT UNIQUE,
+		title               TEXT NOT NULL DEFAULT '',
+		subtitle            TEXT DEFAULT '',
+		body                TEXT NOT NULL DEFAULT '',
+		archived            INTEGER DEFAULT 0,
+		encrypted           INTEGER DEFAULT 0,
+		has_files           INTEGER DEFAULT 0,
+		has_images          INTEGER DEFAULT 0,
+		has_source_code     INTEGER DEFAULT 0,
+		locked              INTEGER DEFAULT 0,
+		pinned              INTEGER DEFAULT 0,
+		shown_in_today      INTEGER DEFAULT 0,
+		trashed             INTEGER DEFAULT 0,
+		permanently_deleted INTEGER DEFAULT 0,
+		skip_sync           INTEGER DEFAULT 0,
+		todo_completed      INTEGER DEFAULT 0,
+		todo_incompleted    INTEGER DEFAULT 0,
+		version             INTEGER DEFAULT 0,
+		created_at          TEXT,
+		modified_at         TEXT,
+		archived_at         TEXT,
+		encrypted_at        TEXT,
+		locked_at           TEXT,
+		pinned_at           TEXT,
+		trashed_at          TEXT,
+		order_date          TEXT,
+		conflict_id_date    TEXT,
+		last_editing_device TEXT,
+		conflict_id         TEXT,
+		encryption_id       TEXT,
+		encrypted_data      BLOB,
+		sync_status         TEXT DEFAULT 'synced',
+		hub_modified_at     TEXT,
+		bear_raw            TEXT,
+		pending_bear_title  TEXT,
+		pending_bear_body   TEXT
+	)`)
+	require.NoError(t, err)
+
+	// Insert a row with old schema.
+	_, err = db.ExecContext(ctx,
+		"INSERT INTO notes (id, title, body) VALUES (?, ?, ?)",
+		"n-old", "Old Note", "Old Body",
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	// Reopen with NewSQLiteStore — migration should add expected_bear_modified_at.
+	s, err := store.NewSQLiteStore(dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	// Verify column exists and old row has NULL.
+	var ebma sql.NullString
+	err = s.DB().QueryRowContext(ctx,
+		"SELECT expected_bear_modified_at FROM notes WHERE id = ?", "n-old",
+	).Scan(&ebma)
+	require.NoError(t, err)
+	assert.False(t, ebma.Valid, "expected_bear_modified_at should be NULL for migrated row")
+}
+
+func TestExpectedBearModifiedAt_NullByDefault(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:    "n-ebma-null",
+		Title: "Test",
+		Body:  "Body",
+	}))
+
+	var ebma sql.NullString
+	err := s.DB().QueryRowContext(ctx,
+		"SELECT expected_bear_modified_at FROM notes WHERE id = ?", "n-ebma-null",
+	).Scan(&ebma)
+	require.NoError(t, err)
+	assert.False(t, ebma.Valid, "expected_bear_modified_at should be NULL by default")
+
+	note, err := s.GetNote(ctx, "n-ebma-null")
+	require.NoError(t, err)
+	assert.Nil(t, note.ExpectedBearModifiedAt, "ExpectedBearModifiedAt should be nil from NULL")
+}
+
+func TestExpectedBearModifiedAt_RoundTrip(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	ebmaVal := "789654321.123456"
+
+	// Create with ExpectedBearModifiedAt set.
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:                     "n-ebma-rt",
+		Title:                  "Test",
+		Body:                   "Body",
+		SyncStatus:             "pending_to_bear",
+		ExpectedBearModifiedAt: &ebmaVal,
+	}))
+
+	// Verify round-trip through GetNote.
+	note, err := s.GetNote(ctx, "n-ebma-rt")
+	require.NoError(t, err)
+	require.NotNil(t, note.ExpectedBearModifiedAt)
+	assert.Equal(t, ebmaVal, *note.ExpectedBearModifiedAt)
+
+	// Update and verify round-trip through UpdateNote.
+	newVal := "789654999.654321"
+	note.ExpectedBearModifiedAt = &newVal
+	require.NoError(t, s.UpdateNote(ctx, note))
+
+	note2, err := s.GetNote(ctx, "n-ebma-rt")
+	require.NoError(t, err)
+	require.NotNil(t, note2.ExpectedBearModifiedAt)
+	assert.Equal(t, newVal, *note2.ExpectedBearModifiedAt)
+
+	// Set to nil and verify cleared.
+	note2.ExpectedBearModifiedAt = nil
+	require.NoError(t, s.UpdateNote(ctx, note2))
+
+	note3, err := s.GetNote(ctx, "n-ebma-rt")
+	require.NoError(t, err)
+	assert.Nil(t, note3.ExpectedBearModifiedAt, "ExpectedBearModifiedAt should be nil after clearing")
+}
