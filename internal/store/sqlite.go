@@ -1769,8 +1769,9 @@ func ackUpdateNoteStatus(ctx context.Context, tx *sql.Tx, item *models.SyncAckIt
 	case item.BearID != "":
 		if otherPending > 0 {
 			if _, err := tx.ExecContext(ctx,
-				"UPDATE notes SET bear_id = ?, sync_status = ? WHERE id = ? AND sync_status != 'conflict'",
-				item.BearID, syncStatusPendingToBear, noteID,
+				"UPDATE notes SET bear_id = ?, sync_status = ?, expected_bear_modified_at = ? "+
+					"WHERE id = ? AND sync_status != 'conflict'",
+				item.BearID, syncStatusPendingToBear, toNullString(item.BearModifiedAt), noteID,
 			); err != nil {
 				return fmt.Errorf("set bear_id on ack: %w", err)
 			}
@@ -1793,6 +1794,13 @@ func ackUpdateNoteStatus(ctx context.Context, tx *sql.Tx, item *models.SyncAckIt
 				noteID,
 			); err != nil {
 				return fmt.Errorf("reset sync_status on ack: %w", err)
+			}
+		} else if item.BearModifiedAt != "" {
+			if _, err := tx.ExecContext(ctx,
+				"UPDATE notes SET expected_bear_modified_at = ? WHERE id = ? AND sync_status != 'conflict'",
+				item.BearModifiedAt, noteID,
+			); err != nil {
+				return fmt.Errorf("set expected_bear_modified_at on ack: %w", err)
 			}
 		}
 	}
@@ -1916,6 +1924,15 @@ func (s *SQLiteStore) loadNoteTags(ctx context.Context, noteID string) ([]models
 	}
 
 	return tags, nil
+}
+
+// toNullString converts an empty string to nil (SQL NULL) and a non-empty string to *string.
+func toNullString(s string) *string {
+	if s == "" {
+		return nil
+	}
+
+	return &s
 }
 
 func generateID() (string, error) {

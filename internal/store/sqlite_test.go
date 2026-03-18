@@ -1735,3 +1735,96 @@ func TestExpectedBearModifiedAt_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, note3.ExpectedBearModifiedAt, "ExpectedBearModifiedAt should be nil after clearing")
 }
+
+// --- Task 3: Hub stores expected_bear_modified_at on ack ---
+
+func TestAckApplied_ExpectedBearModifiedAtBehavior(t *testing.T) {
+	tests := []struct {
+		name           string
+		noteID         string
+		numQueueItems  int // how many queue items to enqueue (ack first one)
+		ackBearMod     string
+		presetEBMA     *string // initial expected_bear_modified_at on note
+		wantSyncStatus string
+		wantEBMA       *string // expected expected_bear_modified_at after ack
+	}{
+		{
+			name:           "sets expected_bear_modified_at from ack when other pending",
+			noteID:         "n-ack-ebma-set",
+			numQueueItems:  2,
+			ackBearMod:     "726842700.5",
+			wantSyncStatus: "pending_to_bear",
+			wantEBMA:       strPtr("726842700.5"),
+		},
+		{
+			name:           "clears expected_bear_modified_at when transitioning to synced",
+			noteID:         "n-ack-ebma-clear",
+			numQueueItems:  1,
+			ackBearMod:     "726842999.0",
+			presetEBMA:     strPtr("726842700.5"),
+			wantSyncStatus: "synced",
+			wantEBMA:       nil,
+		},
+		{
+			name:           "keeps expected_bear_modified_at when other items pending",
+			noteID:         "n-ack-ebma-keep",
+			numQueueItems:  2,
+			ackBearMod:     "726842700.5",
+			wantSyncStatus: "pending_to_bear",
+			wantEBMA:       strPtr("726842700.5"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestStore(t)
+			ctx := context.Background()
+
+			require.NoError(t, s.CreateNote(ctx, &models.Note{
+				ID:                     tt.noteID,
+				Title:                  "Title",
+				Body:                   "Body",
+				SyncStatus:             "pending_to_bear",
+				ExpectedBearModifiedAt: tt.presetEBMA,
+			}))
+
+			// Enqueue N writes for the same note.
+			var firstItemID int64
+			for i := range tt.numQueueItems {
+				item, err := s.EnqueueWrite(ctx,
+					fmt.Sprintf("key-%s-%d", tt.noteID, i), "update", tt.noteID,
+					fmt.Sprintf(`{"title":"T%d"}`, i), "")
+				require.NoError(t, err)
+				if i == 0 {
+					firstItemID = item.ID
+				}
+			}
+
+			_, err := s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
+			require.NoError(t, err)
+
+			err = s.AckQueueItems(ctx, []models.SyncAckItem{
+				{
+					QueueID:        firstItemID,
+					IdempotencyKey: fmt.Sprintf("key-%s-0", tt.noteID),
+					Status:         "applied",
+					BearModifiedAt: tt.ackBearMod,
+				},
+			})
+			require.NoError(t, err)
+
+			note, err := s.GetNote(ctx, tt.noteID)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantSyncStatus, note.SyncStatus)
+
+			if tt.wantEBMA == nil {
+				assert.Nil(t, note.ExpectedBearModifiedAt,
+					"expected_bear_modified_at should be NULL")
+			} else {
+				require.NotNil(t, note.ExpectedBearModifiedAt,
+					"expected_bear_modified_at should not be NULL")
+				assert.Equal(t, *tt.wantEBMA, *note.ExpectedBearModifiedAt)
+			}
+		})
+	}
+}

@@ -88,11 +88,11 @@ Hub:      modified_at changed + pending_to_bear → detectContentConflict → FA
 - [x] run tests — must pass before next task
 
 ### Task 3: Hub stores `expected_bear_modified_at` on ack
-- [ ] write test in `internal/store/sqlite_test.go`: when `AckQueueItems` receives ack with `BearModifiedAt`, the note's `expected_bear_modified_at` is set to that value
-- [ ] write test: when ack transitions note to `synced` (otherPending=0), `expected_bear_modified_at` is cleared (set to NULL)
-- [ ] write test: when ack keeps note as `pending_to_bear` (otherPending>0), `expected_bear_modified_at` is set (not cleared)
-- [ ] modify `ackUpdateNoteStatus` in `internal/store/sqlite.go`: add `BearModifiedAt` to UPDATE queries — set it when `item.BearModifiedAt != ""`, clear it (NULL) when transitioning to `synced`
-- [ ] run tests — must pass before next task
+- [x] write test in `internal/store/sqlite_test.go`: when `AckQueueItems` receives ack with `BearModifiedAt`, the note's `expected_bear_modified_at` is set to that value
+- [x] write test: when ack transitions note to `synced` (otherPending=0), `expected_bear_modified_at` is cleared (set to NULL)
+- [x] write test: when ack keeps note as `pending_to_bear` (otherPending>0), `expected_bear_modified_at` is set (not cleared)
+- [x] modify `ackUpdateNoteStatus` in `internal/store/sqlite.go`: add `BearModifiedAt` to UPDATE queries — set it when `item.BearModifiedAt != ""`, clear it (NULL) when transitioning to `synced`
+- [x] run tests — must pass before next task
 
 ### Task 4: Echo detection in `updateExistingNote`
 - [ ] write test: Bear delta push with `modified_at` matching `expected_bear_modified_at` while note is `pending_to_bear` → skip conflict detection, stay `pending_to_bear`
