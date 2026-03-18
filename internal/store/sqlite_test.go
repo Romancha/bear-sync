@@ -2041,3 +2041,278 @@ func TestWriteQueue_CoalesceNoPendingItem(t *testing.T) {
 	assert.Equal(t, "key-1", item.IdempotencyKey)
 	assert.Equal(t, "", item.SecondaryIdempotencyKey)
 }
+
+// --- Acceptance Tests ---
+
+// TestAcceptance_RapidUpdateCoalescing verifies Problem 1: rapid sequential consumer
+// updates for the same note produce a single coalesced queue item and no false conflict
+// when the Bear delta push arrives after the bridge applies the coalesced item.
+func TestAcceptance_RapidUpdateCoalescing(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// Setup: a synced note exists in the hub.
+	bearID := "bear-rapid-1"
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:         "n-rapid",
+		BearID:     &bearID,
+		Title:      "Original Title",
+		Body:       "Original Body",
+		SyncStatus: "synced",
+		ModifiedAt: "2025-01-01T10:00:00Z",
+	}))
+
+	// Consumer sends two rapid updates (title='B' then title='C').
+	item1, err := s.EnqueueWrite(ctx, "key-rapid-1", "update", "n-rapid",
+		`{"title":"B","bear_id":"bear-rapid-1"}`, "consumer-a")
+	require.NoError(t, err)
+
+	item2, err := s.EnqueueWrite(ctx, "key-rapid-2", "update", "n-rapid",
+		`{"title":"C","bear_id":"bear-rapid-1"}`, "consumer-a")
+	require.NoError(t, err)
+
+	// Coalescing: only one queue item should exist with the final payload.
+	assert.Equal(t, item1.ID, item2.ID, "rapid updates should coalesce into one item")
+	assert.Equal(t, `{"title":"C","bear_id":"bear-rapid-1"}`, item2.Payload)
+
+	// Bridge leases and applies the single item.
+	items, err := s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1, "only one coalesced item should be leased")
+
+	// Bridge ack with BearModifiedAt from Bear after apply.
+	require.NoError(t, s.AckQueueItems(ctx, []models.SyncAckItem{
+		{QueueID: items[0].ID, Status: "applied", BearModifiedAt: "2025-01-01T12:00:00Z"},
+	}))
+
+	// Note should transition to synced (no other pending items).
+	got, err := s.GetNote(ctx, "n-rapid")
+	require.NoError(t, err)
+	assert.Equal(t, "synced", got.SyncStatus, "note should be synced after single ack")
+
+	// Bear delta push arrives — should NOT trigger conflict.
+	req := models.SyncPushRequest{
+		Notes: []models.Note{
+			{
+				BearID:     &bearID,
+				Title:      "C",
+				Body:       "Original Body",
+				ModifiedAt: "2025-01-01T12:00:00Z",
+				SyncStatus: "synced",
+			},
+		},
+	}
+	require.NoError(t, s.ProcessSyncPush(ctx, req))
+
+	got, err = s.GetNote(ctx, "n-rapid")
+	require.NoError(t, err)
+	assert.Equal(t, "synced", got.SyncStatus, "no false conflict from rapid updates")
+}
+
+// TestAcceptance_EchoDetection verifies Problem 2: Bear's modified_at change caused
+// by our own x-callback-url write is recognized as an echo and does not trigger conflict.
+// This is a store-level test, so sync_status transitions are set up directly (the API handler
+// is what normally transitions notes to pending_to_bear via snapshotPendingBear).
+func TestAcceptance_EchoDetection(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// Setup: note is pending_to_bear with two queue items (update + add_tag).
+	// This simulates a consumer that enqueued writes, with the API handler having
+	// already transitioned the note to pending_to_bear.
+	bearID := "bear-echo-true"
+	origTitle := "Title"
+	origBody := "Body"
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:               "n-echo-true",
+		BearID:           &bearID,
+		Title:            "Title",
+		Body:             "Body",
+		SyncStatus:       "pending_to_bear",
+		ModifiedAt:       "2025-01-01T10:00:00Z",
+		PendingBearTitle: &origTitle,
+		PendingBearBody:  &origBody,
+	}))
+
+	// Enqueue two items (different actions to avoid coalescing).
+	upd, err := s.EnqueueWrite(ctx, "key-true-1", "update", "n-echo-true",
+		`{"body":"New Body"}`, "consumer-a")
+	require.NoError(t, err)
+	addTag, err := s.EnqueueWrite(ctx, "key-true-2", "add_tag", "n-echo-true",
+		`{"tag":"#test"}`, "consumer-a")
+	require.NoError(t, err)
+
+	// Bridge leases both items.
+	leased, err := s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, leased, 2)
+
+	// Ack only the update item with BearModifiedAt=T2.
+	// The add_tag item remains processing, so note stays pending_to_bear.
+	require.NoError(t, s.AckQueueItems(ctx, []models.SyncAckItem{
+		{QueueID: upd.ID, Status: "applied", BearModifiedAt: "2025-01-01T11:30:00Z"},
+	}))
+
+	// Note should still be pending_to_bear (add_tag is still processing).
+	got, err := s.GetNote(ctx, "n-echo-true")
+	require.NoError(t, err)
+	assert.Equal(t, "pending_to_bear", got.SyncStatus)
+	require.NotNil(t, got.ExpectedBearModifiedAt)
+	assert.Equal(t, "2025-01-01T11:30:00Z", *got.ExpectedBearModifiedAt)
+
+	// Bear delta push arrives with modified_at=T2 (echo of the update apply).
+	// This should be recognized as an echo and NOT trigger conflict.
+	req := models.SyncPushRequest{
+		Notes: []models.Note{
+			{
+				BearID:     &bearID,
+				Title:      "Title",
+				Body:       "New Body",
+				ModifiedAt: "2025-01-01T11:30:00Z",
+				SyncStatus: "synced",
+			},
+		},
+	}
+	require.NoError(t, s.ProcessSyncPush(ctx, req))
+
+	got, err = s.GetNote(ctx, "n-echo-true")
+	require.NoError(t, err)
+	assert.Equal(t, "pending_to_bear", got.SyncStatus, "echo detected, stays pending_to_bear")
+	assert.Nil(t, got.ExpectedBearModifiedAt, "expected_bear_modified_at consumed after echo")
+
+	// Ack the remaining add_tag item to clean up.
+	require.NoError(t, s.AckQueueItems(ctx, []models.SyncAckItem{
+		{QueueID: addTag.ID, Status: "applied"},
+	}))
+
+	got, err = s.GetNote(ctx, "n-echo-true")
+	require.NoError(t, err)
+	assert.Equal(t, "synced", got.SyncStatus, "all items acked, note becomes synced")
+}
+
+// TestAcceptance_CreateUpdateCoalescing verifies create->update coalescing:
+// a single create item with the final content reaches Bear.
+func TestAcceptance_CreateUpdateCoalescing(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// Create a note without a BearID (hub-only, pending create).
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:         "n-create",
+		Title:      "Initial Title",
+		Body:       "Initial Body",
+		SyncStatus: "pending_to_bear",
+	}))
+
+	// Enqueue the create action.
+	createItem, err := s.EnqueueWrite(ctx, "key-create-1", "create", "n-create",
+		`{"title":"Initial Title","body":"Initial Body","tags":["#tag1"]}`, "consumer-a")
+	require.NoError(t, err)
+
+	// Consumer updates the note before bridge processes it.
+	coalesced, err := s.CoalesceCreateUpdate(ctx, "key-update-1", "n-create",
+		`{"title":"Updated Title","body":"Updated Body"}`, "consumer-a")
+	require.NoError(t, err)
+	require.NotNil(t, coalesced, "should find and coalesce with pending create")
+	assert.Equal(t, createItem.ID, coalesced.ID, "same queue item")
+
+	// Verify the payload has the updated title/body but preserves tags.
+	assert.Contains(t, coalesced.Payload, `"title":"Updated Title"`)
+	assert.Contains(t, coalesced.Payload, `"body":"Updated Body"`)
+	assert.Contains(t, coalesced.Payload, `"tags"`)
+	assert.Contains(t, coalesced.Payload, `#tag1`)
+
+	// Bridge leases — only one item.
+	items, err := s.LeaseQueueItems(ctx, "bridge-1", 5*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "create", items[0].Action)
+	assert.Contains(t, items[0].Payload, `"Updated Title"`)
+}
+
+// TestAcceptance_BackwardCompat_NullExpectedBearModifiedAt verifies that notes
+// without expected_bear_modified_at (NULL) behave exactly as before — conflict
+// detection proceeds based on field-level comparison.
+func TestAcceptance_BackwardCompat_NullExpectedBearModifiedAt(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	bearID := "bear-compat-1"
+	origTitle := "Base Title"
+	origBody := "Base Body"
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:                     "n-compat",
+		BearID:                 &bearID,
+		Title:                  "Consumer Title",
+		Body:                   "Consumer Body",
+		SyncStatus:             "pending_to_bear",
+		ModifiedAt:             "2025-01-01T10:00:00Z",
+		PendingBearTitle:       &origTitle,
+		PendingBearBody:        &origBody,
+		ExpectedBearModifiedAt: nil, // NULL — backward compat scenario.
+	}))
+
+	// Bear delta push with changed modified_at and Bear changed body (same field consumer changed).
+	// With NULL expected_bear_modified_at, should fall through to field-level conflict detection.
+	req := models.SyncPushRequest{
+		Notes: []models.Note{
+			{
+				BearID:     &bearID,
+				Title:      "Base Title",
+				Body:       "Bear Changed Body",
+				ModifiedAt: "2025-01-01T11:00:00Z",
+				SyncStatus: "synced",
+			},
+		},
+	}
+	require.NoError(t, s.ProcessSyncPush(ctx, req))
+
+	got, err := s.GetNote(ctx, "n-compat")
+	require.NoError(t, err)
+	assert.Equal(t, "conflict", got.SyncStatus,
+		"with NULL expected_bear_modified_at, field-level conflict should fire as before")
+}
+
+// TestAcceptance_RealConflictStillDetected verifies that genuine conflicts
+// (Bear user edits body + consumer edits body) are still correctly detected
+// even with the new echo detection and coalescing in place.
+func TestAcceptance_RealConflictStillDetected(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	bearID := "bear-real-conflict"
+	origTitle := "Same Title"
+	origBody := "Base Body Content"
+	require.NoError(t, s.CreateNote(ctx, &models.Note{
+		ID:                     "n-conflict",
+		BearID:                 &bearID,
+		Title:                  "Same Title",
+		Body:                   "Consumer Changed Body",
+		SyncStatus:             "pending_to_bear",
+		ModifiedAt:             "2025-01-01T10:00:00Z",
+		PendingBearTitle:       &origTitle,
+		PendingBearBody:        &origBody,
+		ExpectedBearModifiedAt: strPtr("2025-01-01T09:00:00Z"), // Set but won't match incoming.
+	}))
+
+	// Bear user edits the body independently (modified_at differs from expected).
+	req := models.SyncPushRequest{
+		Notes: []models.Note{
+			{
+				BearID:     &bearID,
+				Title:      "Same Title",
+				Body:       "Bear User Changed Body",
+				ModifiedAt: "2025-01-01T11:00:00Z", // Different from expected (09:00).
+				SyncStatus: "synced",
+			},
+		},
+	}
+	require.NoError(t, s.ProcessSyncPush(ctx, req))
+
+	got, err := s.GetNote(ctx, "n-conflict")
+	require.NoError(t, err)
+	assert.Equal(t, "conflict", got.SyncStatus,
+		"real conflict: both Bear user and consumer changed body → conflict must fire")
+	assert.Equal(t, "Same Title", got.Title, "hub title preserved")
+	assert.Equal(t, "Consumer Changed Body", got.Body, "consumer body preserved")
+}

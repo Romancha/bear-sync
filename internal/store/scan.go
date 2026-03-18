@@ -37,45 +37,45 @@ func noteColumnsWithPrefix(prefix string) string {
 }
 
 type noteScanner struct {
-	RowID              int64
-	ID                 string
-	BearID             sql.NullString
-	Title              sql.NullString
-	Subtitle           sql.NullString
-	Body               sql.NullString
-	Archived           sql.NullInt64
-	Encrypted          sql.NullInt64
-	HasFiles           sql.NullInt64
-	HasImages          sql.NullInt64
-	HasSourceCode      sql.NullInt64
-	Locked             sql.NullInt64
-	Pinned             sql.NullInt64
-	ShownInToday       sql.NullInt64
-	Trashed            sql.NullInt64
-	PermanentlyDeleted sql.NullInt64
-	SkipSync           sql.NullInt64
-	TodoCompleted      sql.NullInt64
-	TodoIncompleted    sql.NullInt64
-	Version            sql.NullInt64
-	CreatedAt          sql.NullString
-	ModifiedAt         sql.NullString
-	ArchivedAt         sql.NullString
-	EncryptedAt        sql.NullString
-	LockedAt           sql.NullString
-	PinnedAt           sql.NullString
-	TrashedAt          sql.NullString
-	OrderDate          sql.NullString
-	ConflictIDDate     sql.NullString
-	LastEditingDevice  sql.NullString
-	ConflictID         sql.NullString
-	EncryptionID       sql.NullString
-	EncryptedData      []byte
-	SyncStatus         sql.NullString
-	HubModifiedAt      sql.NullString
-	BearRaw            sql.NullString
-	PendingBearTitle        sql.NullString
-	PendingBearBody         sql.NullString
-	ExpectedBearModifiedAt  sql.NullString
+	RowID                  int64
+	ID                     string
+	BearID                 sql.NullString
+	Title                  sql.NullString
+	Subtitle               sql.NullString
+	Body                   sql.NullString
+	Archived               sql.NullInt64
+	Encrypted              sql.NullInt64
+	HasFiles               sql.NullInt64
+	HasImages              sql.NullInt64
+	HasSourceCode          sql.NullInt64
+	Locked                 sql.NullInt64
+	Pinned                 sql.NullInt64
+	ShownInToday           sql.NullInt64
+	Trashed                sql.NullInt64
+	PermanentlyDeleted     sql.NullInt64
+	SkipSync               sql.NullInt64
+	TodoCompleted          sql.NullInt64
+	TodoIncompleted        sql.NullInt64
+	Version                sql.NullInt64
+	CreatedAt              sql.NullString
+	ModifiedAt             sql.NullString
+	ArchivedAt             sql.NullString
+	EncryptedAt            sql.NullString
+	LockedAt               sql.NullString
+	PinnedAt               sql.NullString
+	TrashedAt              sql.NullString
+	OrderDate              sql.NullString
+	ConflictIDDate         sql.NullString
+	LastEditingDevice      sql.NullString
+	ConflictID             sql.NullString
+	EncryptionID           sql.NullString
+	EncryptedData          []byte
+	SyncStatus             sql.NullString
+	HubModifiedAt          sql.NullString
+	BearRaw                sql.NullString
+	PendingBearTitle       sql.NullString
+	PendingBearBody        sql.NullString
+	ExpectedBearModifiedAt sql.NullString
 }
 
 func (ns *noteScanner) dest() []any {
@@ -533,16 +533,16 @@ func prefixedWriteQueueColumns(prefix string) string {
 }
 
 type writeQueueScanner struct {
-	ID             int64
-	IdempotencyKey string
-	Action         sql.NullString
-	NoteID         sql.NullString
-	Payload        sql.NullString
-	CreatedAt      sql.NullString
-	Status         sql.NullString
-	ProcessingBy   sql.NullString
-	LeaseUntil     sql.NullString
-	AppliedAt      sql.NullString
+	ID                      int64
+	IdempotencyKey          string
+	Action                  sql.NullString
+	NoteID                  sql.NullString
+	Payload                 sql.NullString
+	CreatedAt               sql.NullString
+	Status                  sql.NullString
+	ProcessingBy            sql.NullString
+	LeaseUntil              sql.NullString
+	AppliedAt               sql.NullString
 	Error                   sql.NullString
 	ConsumerID              sql.NullString
 	SecondaryIdempotencyKey sql.NullString
@@ -558,16 +558,16 @@ func (ws *writeQueueScanner) dest() []any {
 
 func (ws *writeQueueScanner) toItem() models.WriteQueueItem {
 	return models.WriteQueueItem{
-		ID:             ws.ID,
-		IdempotencyKey: ws.IdempotencyKey,
-		Action:         ws.Action.String,
-		NoteID:         ws.NoteID.String,
-		Payload:        ws.Payload.String,
-		CreatedAt:      ws.CreatedAt.String,
-		Status:         ws.Status.String,
-		ProcessingBy:   ws.ProcessingBy.String,
-		LeaseUntil:     ws.LeaseUntil.String,
-		AppliedAt:      ws.AppliedAt.String,
+		ID:                      ws.ID,
+		IdempotencyKey:          ws.IdempotencyKey,
+		Action:                  ws.Action.String,
+		NoteID:                  ws.NoteID.String,
+		Payload:                 ws.Payload.String,
+		CreatedAt:               ws.CreatedAt.String,
+		Status:                  ws.Status.String,
+		ProcessingBy:            ws.ProcessingBy.String,
+		LeaseUntil:              ws.LeaseUntil.String,
+		AppliedAt:               ws.AppliedAt.String,
 		Error:                   ws.Error.String,
 		ConsumerID:              ws.ConsumerID.String,
 		SecondaryIdempotencyKey: ws.SecondaryIdempotencyKey.String,

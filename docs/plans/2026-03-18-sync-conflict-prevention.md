@@ -124,16 +124,16 @@ Hub:      modified_at changed + pending_to_bear → detectContentConflict → FA
 - [x] run tests — must pass before next task
 
 ### Task 7: Verify acceptance criteria
-- [ ] verify Problem 1 scenario: rapid update→update produces single coalesced queue item, no false conflict
-- [ ] verify Problem 2 scenario: Bear echo after apply is detected, no false conflict
-- [ ] verify create→update coalescing: single create item with final content reaches Bear
-- [ ] verify backward compat: notes without `expected_bear_modified_at` (NULL) behave as before
-- [ ] verify real conflicts still detected: Bear user edits body + consumer edits body → conflict fires
-- [ ] run full test suite: `make test`
-- [ ] run race detector: `make test-race`
-- [ ] run linter: `make lint`
-- [ ] run formatter: `make fmt`
-- [ ] verify test coverage does not decrease: `make test-coverage`
+- [x] verify Problem 1 scenario: rapid update→update produces single coalesced queue item, no false conflict
+- [x] verify Problem 2 scenario: Bear echo after apply is detected, no false conflict
+- [x] verify create→update coalescing: single create item with final content reaches Bear
+- [x] verify backward compat: notes without `expected_bear_modified_at` (NULL) behave as before
+- [x] verify real conflicts still detected: Bear user edits body + consumer edits body → conflict fires
+- [x] run full test suite: `make test`
+- [x] run race detector: `make test-race`
+- [x] run linter: `make lint`
+- [x] run formatter: `make fmt`
+- [x] verify test coverage does not decrease: `make test-coverage`
 
 ### Task 8: [Final] Update documentation
 - [ ] update `CLAUDE.md` sync_status lifecycle section with echo detection and coalescing behavior
