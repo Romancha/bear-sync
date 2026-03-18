@@ -51,6 +51,7 @@ type Store interface {
 	GetQueueItem(ctx context.Context, id int64) (*models.WriteQueueItem, error)
 	GetQueueItemByIdempotencyKey(ctx context.Context, key, consumerID string) (*models.WriteQueueItem, error)
 	EnqueueWrite(ctx context.Context, idempotencyKey, action, noteID, payload, consumerID string) (*models.WriteQueueItem, error)
+	CoalesceCreateUpdate(ctx context.Context, idempotencyKey, noteID, payload, consumerID string) (*models.WriteQueueItem, error)
 	LeaseQueueItems(ctx context.Context, processingBy string, leaseDuration time.Duration) ([]models.WriteQueueItem, error)
 	AckQueueItems(ctx context.Context, items []models.SyncAckItem) error
 	PendingQueueCount(ctx context.Context) (int, error)

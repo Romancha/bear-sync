@@ -116,12 +116,12 @@ Hub:      modified_at changed + pending_to_bear → detectContentConflict → FA
 - [x] run tests — must pass before next task
 
 ### Task 6: Queue coalescing for create→update (merge into create)
-- [ ] write test: consumer creates note (queue item: create, pending), then calls `updateNote` → existing create item's payload is updated with new title/body, no second item created
-- [ ] write test: create→update coalescing preserves tags from original create payload
-- [ ] write test: `updateNote` handler returns 409 when `BearID` is nil — verify this guard is relaxed for notes with pending create items (or update coalescing path bypasses this check)
-- [ ] modify `updateNote` handler in `internal/api/notes_handler.go`: when `note.BearID == nil`, check if a pending `create` queue item exists for this note; if yes, update its payload with new title/body instead of returning 409
-- [ ] update note's title/body in DB (same as current updateNote logic)
-- [ ] run tests — must pass before next task
+- [x] write test: consumer creates note (queue item: create, pending), then calls `updateNote` → existing create item's payload is updated with new title/body, no second item created
+- [x] write test: create→update coalescing preserves tags from original create payload
+- [x] write test: `updateNote` handler returns 409 when `BearID` is nil — verify this guard is relaxed for notes with pending create items (or update coalescing path bypasses this check)
+- [x] modify `updateNote` handler in `internal/api/notes_handler.go`: when `note.BearID == nil`, check if a pending `create` queue item exists for this note; if yes, update its payload with new title/body instead of returning 409
+- [x] update note's title/body in DB (same as current updateNote logic)
+- [x] run tests — must pass before next task
 
 ### Task 7: Verify acceptance criteria
 - [ ] verify Problem 1 scenario: rapid update→update produces single coalesced queue item, no false conflict

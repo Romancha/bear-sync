@@ -1815,4 +1815,84 @@ func TestTrashNote_NoConflictOnBearBodyChange(t *testing.T) {
 	assert.Equal(t, "pending_to_bear", got.SyncStatus, "trash action should not conflict on Bear body change")
 }
 
+func TestUpdateNote_CreateUpdateCoalescing(t *testing.T) {
+	ts, s := setupServer(t)
+	ctx := t.Context()
+
+	// Step 1: Create a note via the API (this creates a pending "create" queue item).
+	createBody := map[string]any{"title": "Original Title", "body": "Original body", "tags": []string{"tag1", "tag2"}}
+	createResp := doRequest(t, ts, http.MethodPost, "/api/notes", createBody, consumerToken,
+		map[string]string{"Idempotency-Key": "create-key-1"})
+	createResult := readBody(t, createResp)
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+	noteID := createResult["id"].(string)
+
+	// Step 2: Update the note before it syncs to Bear (BearID is nil).
+	updateBody := map[string]string{"title": "Updated Title", "body": "Updated body"}
+	updateResp := doRequest(t, ts, http.MethodPut, "/api/notes/"+noteID, updateBody, consumerToken,
+		map[string]string{"Idempotency-Key": "update-key-1"})
+	updateResult := readBody(t, updateResp)
+	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
+	assert.Equal(t, "Updated Title", updateResult["title"])
+	assert.Equal(t, "Updated body", updateResult["body"])
+
+	// Verify only one queue item exists (the create item was coalesced).
+	pendingCount, err := s.PendingQueueCount(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, pendingCount, "should have exactly one queue item (coalesced)")
+
+	// Verify the create queue item's payload was updated with new title/body.
+	item, err := s.GetQueueItemByIdempotencyKey(ctx, "create-key-1", "testapp")
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	assert.Equal(t, "create", item.Action, "coalesced item should remain a create action")
+	assert.Contains(t, item.Payload, `"title":"Updated Title"`)
+	assert.Contains(t, item.Payload, `"body":"Updated body"`)
+}
+
+func TestUpdateNote_CreateUpdateCoalescing_PreservesTags(t *testing.T) {
+	ts, s := setupServer(t)
+	ctx := t.Context()
+
+	// Create note with tags.
+	createBody := map[string]any{"title": "Tagged Note", "body": "body", "tags": []string{"work", "important"}}
+	createResp := doRequest(t, ts, http.MethodPost, "/api/notes", createBody, consumerToken,
+		map[string]string{"Idempotency-Key": "create-tagged"})
+	createResult := readBody(t, createResp)
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+	noteID := createResult["id"].(string)
+
+	// Update body only.
+	updateBody := map[string]string{"body": "New body content"}
+	updateResp := doRequest(t, ts, http.MethodPut, "/api/notes/"+noteID, updateBody, consumerToken,
+		map[string]string{"Idempotency-Key": "update-tagged"})
+	defer updateResp.Body.Close() //nolint:errcheck // test
+	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
+
+	// Verify tags are preserved in the coalesced payload.
+	item, err := s.GetQueueItemByIdempotencyKey(ctx, "create-tagged", "testapp")
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	assert.Contains(t, item.Payload, `"tags"`)
+	assert.Contains(t, item.Payload, `"work"`)
+	assert.Contains(t, item.Payload, `"important"`)
+	assert.Contains(t, item.Payload, `"body":"New body content"`)
+}
+
+func TestUpdateNote_NoBearID_NoPendingCreate_409(t *testing.T) {
+	ts, s := setupServer(t)
+
+	// Create a note directly in DB without bear_id and without a pending create queue item.
+	require.NoError(t, s.CreateNote(t.Context(), &models.Note{
+		ID: "note-orphan", Title: "Orphan", Body: "body", SyncStatus: "pending_to_bear",
+	}))
+
+	body := map[string]string{"body": "Updated body"}
+	resp := doRequest(t, ts, http.MethodPut, "/api/notes/note-orphan", body, consumerToken,
+		map[string]string{"Idempotency-Key": "key-orphan-upd"})
+	defer resp.Body.Close() //nolint:errcheck // test
+
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+}
+
 func strPtr(s string) *string { return &s }

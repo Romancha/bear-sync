@@ -333,11 +333,6 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if note.BearID == nil || *note.BearID == "" {
-		writeError(w, http.StatusConflict, "note not yet synced to Bear; retry after initial sync completes")
-		return
-	}
-
 	if note.SyncStatus == syncStatusConflict {
 		writeError(w, http.StatusConflict, "note has unresolved conflicts; resolve conflicts before updating")
 		return
@@ -365,6 +360,12 @@ func (s *Server) updateNote(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, note)
 			return
 		}
+	}
+
+	// If note has no BearID, it hasn't synced to Bear yet. Try create→update coalescing.
+	if note.BearID == nil || *note.BearID == "" {
+		s.handleCreateUpdateCoalesce(w, r, note, req, idempotencyKey, consumerID)
+		return
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -791,6 +792,50 @@ func writeUploadedFile(dir, filename string, file io.Reader) error {
 	}
 
 	return nil
+}
+
+// handleCreateUpdateCoalesce attempts to merge an update into a pending create queue item
+// for a note that hasn't synced to Bear yet. If no pending create exists, returns 409.
+func (s *Server) handleCreateUpdateCoalesce(
+	w http.ResponseWriter, r *http.Request,
+	note *models.Note, req updateNoteRequest,
+	idempotencyKey, consumerID string,
+) {
+	payloadMap := map[string]string{}
+	if req.Title != "" {
+		payloadMap["title"] = req.Title
+	}
+	if req.Body != "" {
+		payloadMap["body"] = req.Body
+	}
+	payload, _ := json.Marshal(payloadMap) //nolint:errcheck // marshaling a simple map cannot fail
+
+	coalesced, err := s.store.CoalesceCreateUpdate(
+		r.Context(), idempotencyKey, note.ID, string(payload), consumerID,
+	)
+	if err != nil {
+		writeInternalError(w, "failed to coalesce create-update", err)
+		return
+	}
+	if coalesced == nil {
+		writeError(w, http.StatusConflict, "note not yet synced to Bear; retry after initial sync completes")
+		return
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if req.Title != "" {
+		note.Title = req.Title
+	}
+	if req.Body != "" {
+		note.Body = req.Body
+	}
+	note.HubModifiedAt = now
+	if err := s.store.UpdateNote(r.Context(), note); err != nil {
+		writeInternalError(w, "failed to update note", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, note)
 }
 
 // isRetryableQueueItem returns true if an existing queue item for this idempotency key

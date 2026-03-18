@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -1662,6 +1663,65 @@ func (s *SQLiteStore) coalesceUpdate(
 	))
 	if err != nil {
 		return nil, fmt.Errorf("read coalesced item: %w", err)
+	}
+
+	return &item, nil
+}
+
+// CoalesceCreateUpdate checks for an existing pending create queue item for the given note and consumer.
+// If found, it merges the update payload (title/body) into the create item's payload, preserving
+// tags from the original create. The new idempotency key is stored as the secondary key.
+// Returns nil if no pending create item was found.
+func (s *SQLiteStore) CoalesceCreateUpdate(
+	ctx context.Context, newKey, noteID, payload, consumerID string,
+) (*models.WriteQueueItem, error) {
+	var existingID int64
+	var existingPayload string
+	err := s.db.QueryRowContext(ctx,
+		"SELECT id, payload FROM write_queue WHERE note_id = ? AND action = 'create' AND status = 'pending' AND consumer_id = ? LIMIT 1",
+		noteID, consumerID,
+	).Scan(&existingID, &existingPayload)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("find pending create: %w", err)
+	}
+
+	// Parse the original create payload and the update payload, then merge.
+	var createMap map[string]any
+	if jsonErr := json.Unmarshal([]byte(existingPayload), &createMap); jsonErr != nil {
+		return nil, fmt.Errorf("unmarshal create payload: %w", jsonErr)
+	}
+
+	var updateMap map[string]string
+	if jsonErr := json.Unmarshal([]byte(payload), &updateMap); jsonErr != nil {
+		return nil, fmt.Errorf("unmarshal update payload: %w", jsonErr)
+	}
+
+	// Merge update fields into create payload (title, body).
+	if v, ok := updateMap["title"]; ok {
+		createMap["title"] = v
+	}
+	if v, ok := updateMap["body"]; ok {
+		createMap["body"] = v
+	}
+
+	merged, _ := json.Marshal(createMap) //nolint:errcheck // marshaling a map cannot fail
+
+	if _, execErr := s.db.ExecContext(ctx,
+		"UPDATE write_queue SET payload = ?, secondary_idempotency_key = ? WHERE id = ? AND status = 'pending'",
+		string(merged), newKey, existingID,
+	); execErr != nil {
+		return nil, fmt.Errorf("update coalesced create item: %w", execErr)
+	}
+
+	item, scanErr := scanWriteQueueRow(s.db.QueryRowContext(ctx,
+		"SELECT "+writeQueueColumns()+" FROM write_queue WHERE id = ?", existingID,
+	))
+	if scanErr != nil {
+		return nil, fmt.Errorf("read coalesced create item: %w", scanErr)
 	}
 
 	return &item, nil
