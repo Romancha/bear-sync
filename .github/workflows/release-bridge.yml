@@ -64,10 +64,8 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Inject version into Info.plist
+          # Inject version via xcodebuild build settings (overrides MARKETING_VERSION in .pbxproj)
           APP_VERSION="${VERSION#v}"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_VERSION" tools/salmon-run-app/SalmonRun/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" tools/salmon-run-app/SalmonRun/Info.plist
 
           # Build Swift app for target architecture
           xcodebuild -project tools/salmon-run-app/SalmonRun.xcodeproj \
@@ -76,6 +74,8 @@ jobs:
             ONLY_ACTIVE_ARCH=NO \
             CONFIGURATION_BUILD_DIR="$PWD/bin/xcodebuild-out" \
             CODE_SIGN_IDENTITY="-" \
+            MARKETING_VERSION="$APP_VERSION" \
+            CURRENT_PROJECT_VERSION="$APP_VERSION" \
             build
 
       - name: Import code signing certificate
