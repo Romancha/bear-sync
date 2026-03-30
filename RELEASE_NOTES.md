@@ -1,5 +1,17 @@
 # Release Notes
 
+## Version 0.5.0 — 30 Mar 2026
+
+### 🆕 New
+
+- Attachments are now included in note API responses (list, search, get) with `id`, `type`, `filename`, `file_size`, `width`, and `height` fields. Use the attachment `id` with `GET /api/attachments/{id}` to download files.
+
+### 🐞 Fixes
+
+- Internal fields (`bear_raw`, `encrypted_data`, `hub_modified_at`) are no longer exposed in consumer API responses for notes, tags, and backlinks.
+
+---
+
 ## Version 0.4.1 — 23 Mar 2026
 
 ### 🐞 Fixes

@@ -4,21 +4,21 @@ Syncs Bear notes with external consumers. Two components: **hub** (API server on
 
 ## Why Salmon?
 
-Bear catches salmon — Bear.app is the source of truth for notes, and Salmon is the data that flows through the system. The salmon run (upstream migration) represents the bridge pulling data from Bear to the hub. The hub serves data downstream to consumers like a salmon stream. The bidirectional flow of data — notes flowing upstream from Bear to consumers, and write operations flowing back downstream to Bear — mirrors the salmon lifecycle.
+Bear catches salmon — Bear.app is the source of truth for notes, and Salmon is the data that flows through the system. The salmon run (upstream migration) represents data flowing from Bear to the hub. The hub serves data downstream to consumers like a salmon stream. The bidirectional flow of data — notes flowing upstream from Bear to consumers, and write operations flowing back downstream to Bear — mirrors the salmon lifecycle.
 
 ## Architecture
 
 ### Components
 
-**Bear** — source of truth for all note content. Stores notes in a local SQLite database (Core Data schema). The bridge reads this database directly and applies writes via Bear's x-callback-url scheme.
+**Bear** — source of truth for all note content. Stores notes in a local SQLite database (Core Data schema). Salmon Run reads this database directly and applies writes via Bear's x-callback-url scheme.
 
 **Salmon Run** (`bin/salmon-run`) — Mac agent that runs on the same machine as Bear. Runs in daemon mode (`--daemon`) with a continuous sync loop, managed by SalmonRun.app. Reads Bear's SQLite, detects changes since the last run, pushes them to the hub, and pulls pending write operations from the hub to apply back to Bear via bear-xcall.
 
-**SalmonRun.app** — native macOS menu bar application that wraps the salmon-run binary. Provides a GUI for monitoring sync status, viewing logs, triggering manual syncs, and configuring settings. The bridge runs as a managed child process in daemon mode.
+**SalmonRun.app** — native macOS menu bar application that wraps the salmon-run binary. Provides a GUI for monitoring sync status, viewing logs, triggering manual syncs, and configuring settings. The salmon-run process runs as a managed child process in daemon mode.
 
 **Hub** (`bin/salmon-hub`) — API server that runs on a VPS. Acts as a read replica of Bear's notes and exposes a REST API for external consumers. Holds a write queue for consumer-initiated changes that need to propagate back to Bear.
 
-**Consumers** — external applications that read and write notes via the hub API. Each consumer is identified by name and authenticated with its own token. Multiple consumers can be configured simultaneously. Consumers communicate only with the hub; never touch Bear or the bridge directly.
+**Consumers** — external applications that read and write notes via the hub API. Each consumer is identified by name and authenticated with its own token. Multiple consumers can be configured simultaneously. Consumers communicate only with the hub; never touch Bear or Salmon Run directly.
 
 ### System Overview
 
@@ -27,7 +27,7 @@ graph TB
     subgraph mac["Mac (user's machine)"]
         Bear["Bear.app\n(SQLite source of truth)"]
         SalmonRunApp["SalmonRun.app\n(menu bar UI)"]
-        Bridge["salmon-run --daemon\n(sync loop)"]
+        SalmonRun["salmon-run --daemon\n(sync loop)"]
         bearxcall["bear-xcall CLI\n(x-callback-url executor)"]
     end
 
@@ -38,12 +38,12 @@ graph TB
 
     Consumer["Consumer\n(API client)"]
 
-    SalmonRunApp -- "manages process\nstdout + IPC socket" --> Bridge
-    Bridge -- "reads Bear SQLite\n(read-only)" --> Bear
-    Bridge -- "applies writes via\nbear:// URL scheme" --> bearxcall
+    SalmonRunApp -- "manages process\nstdout + IPC socket" --> SalmonRun
+    SalmonRun -- "reads Bear SQLite\n(read-only)" --> Bear
+    SalmonRun -- "applies writes via\nbear:// URL scheme" --> bearxcall
     bearxcall -- "x-callback-url" --> Bear
-    Bridge -- "POST /api/sync/push\n(bridge token)" --> Caddy
-    Bridge -- "GET /api/sync/queue\nPOST /api/sync/ack" --> Caddy
+    SalmonRun -- "POST /api/sync/push\n(bridge token)" --> Caddy
+    SalmonRun -- "GET /api/sync/queue\nPOST /api/sync/ack" --> Caddy
     Caddy --> Hub
     Consumer -- "GET/POST/PUT/DELETE /api/notes/, /api/tags/\n(consumer token)" --> Caddy
 ```
@@ -61,17 +61,17 @@ stateDiagram-v2
     [*] --> synced: Bear push (initial/delta)
 
     synced --> pending: consumer enqueues write\n(POST/PUT/DELETE)
-    pending --> synced: bridge ACKs applied
+    pending --> synced: Salmon Run ACKs applied
     pending --> conflict: Bear push arrives\nwith overlapping content change
 
-    conflict --> synced: bridge creates [Conflict] note\nand ACKs conflict_resolved=true
+    conflict --> synced: Salmon Run creates [Conflict] note\nand ACKs conflict_resolved=true
 ```
 
-While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`body` on the hub. Conflict detection is field-level: the hub snapshots Bear's title/body when transitioning to `pending_to_bear`, and a conflict is raised only if Bear changed a content field (title or body) that the consumer also changed. Metadata-only changes (e.g., opening the note in Bear) do not trigger a conflict. On conflict, the bridge creates a `[Conflict] Title` note in Bear instead of applying the queued write.
+While a note is `pending_to_bear`, Bear delta pushes do not overwrite `title`/`body` on the hub. Conflict detection is field-level: the hub snapshots Bear's title/body when transitioning to `pending_to_bear`, and a conflict is raised only if Bear changed a content field (title or body) that the consumer also changed. Metadata-only changes (e.g., opening the note in Bear) do not trigger a conflict. On conflict, Salmon Run creates a `[Conflict] Title` note in Bear instead of applying the queued write.
 
 ### Write Actions
 
-Consumers can enqueue write operations via the hub API. The bridge picks them up and applies them to Bear via x-callback-url.
+Consumers can enqueue write operations via the hub API. Salmon Run picks them up and applies them to Bear via x-callback-url.
 
 | Action | Consumer API | Description |
 |---|---|---|
@@ -90,8 +90,8 @@ All mutating consumer endpoints require an `Idempotency-Key` header. Encrypted n
 
 - Go 1.26+
 - Xcode Command Line Tools (for building bear-xcall and SalmonRun.app on macOS; provides `swiftc`)
-- Bear.app (for bridge)
-- bear-xcall CLI (built via `make build-xcall`, for bridge write operations; source in `tools/bear-xcall/`)
+- Bear.app (for salmon-run)
+- bear-xcall CLI (built via `make build-xcall`, for salmon-run write operations; source in `tools/bear-xcall/`)
 
 ## Build
 
@@ -111,7 +111,7 @@ Binaries are placed in `bin/salmon-hub`, `bin/salmon-run`, `bin/bear-xcall.app`,
 | `SALMON_HUB_PORT` | No | `7433` | Listen port |
 | `SALMON_HUB_DB_PATH` | Yes | — | Path to SQLite database file |
 | `SALMON_HUB_CONSUMER_TOKENS` | Yes | — | Consumer tokens in `name:token` format, comma-separated (e.g. `openclaw:secret1,myapp:secret2`) |
-| `SALMON_HUB_BRIDGE_TOKEN` | Yes | — | Bearer token for bridge sync access |
+| `SALMON_HUB_BRIDGE_TOKEN` | Yes | — | Bearer token for Salmon Run sync access |
 | `SALMON_HUB_ATTACHMENTS_DIR` | No | `attachments` | Directory for attachment file storage |
 
 ### Running
@@ -180,7 +180,7 @@ chown -R 1000:1000 /volume1/docker/salmon_hub
 
 This is not needed for Docker named volumes — they inherit permissions from the image automatically.
 
-## Bridge Setup
+## Salmon Run Setup
 
 ### Environment Variables
 
@@ -189,7 +189,7 @@ This is not needed for Docker named volumes — they inherit permissions from th
 | `SALMON_HUB_URL` | Yes | — | Hub API URL (e.g. `https://salmon.example.com`) |
 | `SALMON_HUB_TOKEN` | Yes | — | Bearer token matching `SALMON_HUB_BRIDGE_TOKEN` |
 | `SALMON_BEAR_TOKEN` | Yes | — | Token for Bear x-callback-url API (any string, e.g. `openssl rand -base64 32`; Bear will prompt to allow access on first use) |
-| `SALMON_STATE_PATH` | No | `~/.salmon-state.json` | Path to bridge state file |
+| `SALMON_STATE_PATH` | No | `~/.salmon-state.json` | Path to salmon-run state file |
 | `SALMON_BEAR_DB_DIR` | No | `~/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data` | Path to Bear Application Data directory |
 | `SALMON_SYNC_INTERVAL` | No | `300` | Sync interval in seconds (daemon mode only) |
 | `SALMON_IPC_SOCKET` | No | `~/.salmon.sock` | Unix socket path for IPC (daemon mode only) |
@@ -207,11 +207,11 @@ CLI flags:
 - `--daemon` — run continuously with periodic sync (default interval: 5 minutes)
 - `--version` — print version and exit
 
-The recommended way to run the bridge is via the [Menu Bar App](#menu-bar-app-salmonrunapp), which manages the bridge in daemon mode with a GUI.
+The recommended way to run salmon-run is via the [Menu Bar App](#menu-bar-app-salmonrunapp), which manages it in daemon mode with a GUI.
 
 ## Menu Bar App (SalmonRun.app)
 
-SalmonRun.app is a native macOS menu bar application (macOS 14+) that manages the bridge as a child process in daemon mode and provides a GUI for monitoring and configuration.
+SalmonRun.app is a native macOS menu bar application (macOS 14+) that manages salmon-run as a child process in daemon mode and provides a GUI for monitoring and configuration.
 
 ### Menu Bar UI
 
@@ -243,7 +243,7 @@ The app lives in the macOS menu bar with a sync icon that changes color based on
 - Log viewer window with search, level filtering, and auto-scroll
 - Settings window with Hub URL, tokens (Keychain-secured), sync interval, and Launch at Login
 - macOS notifications on sync errors (rate-limited, configurable)
-- Auto-restart of bridge process on unexpected exit (up to 3 retries)
+- Auto-restart of salmon-run process on unexpected exit (up to 3 retries)
 
 ### Settings
 
@@ -252,14 +252,14 @@ Settings are accessible from the menu bar popup via "Settings...":
 | Tab | Setting | Storage | Description |
 |---|---|---|---|
 | Connection | Hub URL | UserDefaults | URL of your Salmon hub server |
-| Connection | Hub Token | Keychain | Bridge authentication token (matches `SALMON_HUB_BRIDGE_TOKEN`) |
+| Connection | Hub Token | Keychain | Salmon Run authentication token (matches `SALMON_HUB_BRIDGE_TOKEN`) |
 | Connection | Bear Token | Keychain | Token for Bear x-callback-url API |
 | Sync | Sync interval | UserDefaults | How often to sync (1-30 minutes, default 5) |
 | Sync | Sync on launch | Always on | Automatically syncs when the app starts |
 | General | Launch at Login | SMAppService | Auto-start SalmonRun.app on login |
 | General | Notifications | UserDefaults | Show macOS notifications on sync errors |
 
-Tokens are stored securely in the macOS Keychain. All other settings use UserDefaults. The app generates environment variables for the bridge process from these settings.
+Tokens are stored securely in the macOS Keychain. All other settings use UserDefaults. The app generates environment variables for the salmon-run process from these settings.
 
 ### Install
 
@@ -280,7 +280,7 @@ cp -R bin/SalmonRun.app /Applications/
 ### Build
 
 ```
-make build-app       # Build SalmonRun.app (includes bridge + bear-xcall)
+make build-app       # Build SalmonRun.app (includes salmon-run + bear-xcall)
 make test-app        # Run Swift tests
 ```
 
@@ -327,11 +327,11 @@ GitHub Actions runs automatically:
 
 - **CI** (push/PR to main): lint, test, test with race detector
 - **Docker Publish** (push tag `v*`): builds multi-platform hub image (`linux/amd64`, `linux/arm64`) and pushes to `ghcr.io/romancha/salmon-hub`
-- **Release Bridge** (push tag `v*`): builds, signs, notarizes, and publishes SalmonRun.app as .dmg for macOS (`arm64`, `amd64`) as GitHub Release assets
+- **Release** (push tag `v*`): builds, signs, notarizes, and publishes SalmonRun.app as .dmg for macOS (`arm64`, `amd64`) as GitHub Release assets
 
 ### Publishing a release
 
-Tag and push to trigger both Docker and bridge release workflows:
+Tag and push to trigger both Docker and release workflows:
 
 ```
 git tag v0.1.0
@@ -340,9 +340,9 @@ git push origin v0.1.0
 
 Pre-release tags (e.g., `v0.1.0-rc.1`) are automatically marked as pre-releases on GitHub.
 
-### Required GitHub secrets for bridge release
+### Required GitHub secrets for release
 
-The bridge release workflow requires Apple code signing credentials. Set these in the repository settings under Settings > Secrets and variables > Actions:
+The release workflow requires Apple code signing credentials. Set these in the repository settings under Settings > Secrets and variables > Actions:
 
 | Secret | Description |
 |---|---|
