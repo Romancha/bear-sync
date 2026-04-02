@@ -45,11 +45,10 @@ jobs:
 
       - name: Rename binary
         env:
-          VERSION: ${{ steps.version.outputs.version }}
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          BINARY_NAME="salmon-mcp-${VERSION}-${GOOS}-${GOARCH}"
+          BINARY_NAME="salmon-mcp-${GOOS}-${GOARCH}"
           mv salmon-mcp "$BINARY_NAME"
           shasum -a 256 "$BINARY_NAME" > "${BINARY_NAME}.sha256"
           echo "BINARY_NAME=${BINARY_NAME}" >> "$GITHUB_ENV"
@@ -83,5 +82,4 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            salmon-mcp-v*
-            salmon-mcp-v*.sha256
+            salmon-mcp-*

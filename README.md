@@ -318,16 +318,16 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 ```bash
 # macOS (Apple Silicon)
-curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-latest-darwin-arm64
+curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-darwin-arm64
 
 # macOS (Intel)
-curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-latest-darwin-amd64
+curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-darwin-amd64
 
 # Linux (arm64)
-curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-latest-linux-arm64
+curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-linux-arm64
 
 # Linux (amd64)
-curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-latest-linux-amd64
+curl -fsSL -o salmon-mcp https://github.com/Romancha/salmon/releases/latest/download/salmon-mcp-linux-amd64
 ```
 
 Make it executable and move to a directory in your PATH:
