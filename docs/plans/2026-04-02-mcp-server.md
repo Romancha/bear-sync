@@ -106,13 +106,13 @@ MCP (Model Context Protocol) server for the Salmon Hub API. Allows AI assistants
 
 ### Task 7: Verify acceptance criteria
 
-- [ ] all 13 tools registered and tested (search_notes, get_note, list_notes, list_tags, get_attachment, sync_status, list_backlinks, create_note, update_note, trash_note, archive_note, add_tag, rename_tag, delete_tag)
-- [ ] `salmon-mcp` binary builds and starts (prints server info on stderr, listens on stdio)
-- [ ] works with Claude Code: add to `.claude/mcp.json`, verify tool discovery
-- [ ] run full test suite (`make test`)
-- [ ] run linter (`make lint`) — all clean
-- [ ] run race detector (`make test-race`) — no races
-- [ ] verify test coverage (`make test-coverage`)
+- [x] all 13 tools registered and tested (search_notes, get_note, list_notes, list_tags, get_attachment, sync_status, list_backlinks, create_note, update_note, trash_note, archive_note, add_tag, rename_tag, delete_tag)
+- [x] `salmon-mcp` binary builds and starts (prints server info on stderr, listens on stdio)
+- [x] works with Claude Code: add to `.claude/mcp.json`, verify tool discovery (skipped - requires manual verification with live Claude Code instance)
+- [x] run full test suite (`make test`)
+- [x] run linter (`make lint`) — all clean
+- [x] run race detector (`make test-race`) — no races
+- [x] verify test coverage (`make test-coverage`)
 
 ### Task 8: Update documentation
 
