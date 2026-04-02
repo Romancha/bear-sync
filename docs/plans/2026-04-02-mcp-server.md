@@ -58,12 +58,12 @@ MCP (Model Context Protocol) server for the Salmon Hub API. Allows AI assistants
 
 ### Task 2: Read-only tools (notes)
 
-- [ ] create `internal/mcp/tools.go` with `RegisterTools(server, client)` function
-- [ ] implement `search_notes` tool — `GET /api/notes/search?q=&limit=&tag=`
-- [ ] implement `get_note` tool — `GET /api/notes/{id}`
-- [ ] implement `list_notes` tool — `GET /api/notes?tag=&sort=&order=&limit=&trashed=`
-- [ ] write tests for each tool handler: success response parsing, error propagation
-- [ ] run `make test` — must pass
+- [x] create `internal/mcp/tools.go` with `RegisterTools(server, client)` function
+- [x] implement `search_notes` tool — `GET /api/notes/search?q=&limit=&tag=`
+- [x] implement `get_note` tool — `GET /api/notes/{id}`
+- [x] implement `list_notes` tool — `GET /api/notes?tag=&sort=&order=&limit=&trashed=`
+- [x] write tests for each tool handler: success response parsing, error propagation
+- [x] run `make test` — must pass
 
 ### Task 3: Read-only tools (tags, attachments, sync)
 
