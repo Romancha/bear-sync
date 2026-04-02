@@ -147,7 +147,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any) ([]b
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec // G704: URL is from trusted env var SALMON_HUB_URL, not user input
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}

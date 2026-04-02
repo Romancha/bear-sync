@@ -64,7 +64,7 @@ func run() error {
 
 	mcp.RegisterTools(server, client)
 
-	slog.Info("starting salmon MCP server", "hub_url", cfg.hubURL)
+	slog.Info("starting salmon MCP server", "hub_url", cfg.hubURL) //nolint:gosec // G706: hub_url is from trusted env var, not user input
 
 	transport := &gomcp.StdioTransport{}
 
