@@ -38,7 +38,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values) ([]byte
 		u += "?" + query.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -66,7 +66,7 @@ func (c *Client) getRaw(ctx context.Context, path string) (*RawResponse, error) 
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort close on response body
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -123,7 +123,7 @@ func (c *Client) putJSON(ctx context.Context, path string, body any) ([]byte, er
 
 // delete performs a DELETE request.
 func (c *Client) delete(ctx context.Context, path string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+path, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -159,7 +159,7 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // best-effort close on response body
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

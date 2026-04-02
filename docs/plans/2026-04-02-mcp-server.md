@@ -98,11 +98,11 @@ MCP (Model Context Protocol) server for the Salmon Hub API. Allows AI assistants
 
 ### Task 6: CI/CD
 
-- [ ] update `.github/workflows/ci.yml` — ensure `make test` already covers `internal/mcp/` (no changes needed if `go test ./...`)
-- [ ] update `.github/workflows/docker-publish.yml` — add `salmon-mcp` binary to Docker image (or separate image if preferred)
-- [ ] verify `make lint` passes on new code
-- [ ] run `make test-race` — no data races
-- [ ] run `make test-coverage` — coverage does not decrease
+- [x] update `.github/workflows/ci.yml` — ensure `make test` already covers `internal/mcp/` (no changes needed if `go test ./...`)
+- [x] update `.github/workflows/docker-publish.yml` — add `salmon-mcp` binary to Docker image (or separate image if preferred)
+- [x] verify `make lint` passes on new code
+- [x] run `make test-race` — no data races
+- [x] run `make test-coverage` — coverage does not decrease
 
 ### Task 7: Verify acceptance criteria
 

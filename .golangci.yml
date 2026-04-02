@@ -56,6 +56,11 @@ linters:
       - linters:
           - godot
         source: "^// @"
+      - linters:
+          - errcheck
+          - dupl
+          - gosec
+        path: "_test\\.go"
     paths:
       - testdata
       - internal/api/docs
