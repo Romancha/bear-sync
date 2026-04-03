@@ -60,7 +60,12 @@ func run() error {
 	server := gomcp.NewServer(&gomcp.Implementation{
 		Name:    "salmon-mcp",
 		Version: version,
-	}, nil)
+	}, &gomcp.ServerOptions{
+		Instructions: "Salmon MCP server provides access to the user's Bear notes. " +
+			"Use these tools when the user asks about their notes, wants to search, read, create, or edit notes in Bear. " +
+			"Notes are synced from the Bear app via Salmon Hub. " +
+			"Write operations (create, update, trash, archive, tag changes) are queued and applied to Bear asynchronously.",
+	})
 
 	mcp.RegisterTools(server, client)
 
