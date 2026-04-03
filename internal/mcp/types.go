@@ -46,9 +46,6 @@ type ListNotesOutput struct {
 
 // --- List Tags ---
 
-// ListTagsInput is the input for the list_tags tool.
-type ListTagsInput struct{}
-
 // ListTagsOutput is the output for the list_tags tool.
 type ListTagsOutput struct {
 	Tags []models.Tag `json:"tags"`
@@ -70,9 +67,6 @@ type GetAttachmentOutput struct {
 }
 
 // --- Sync Status ---
-
-// SyncStatusInput is the input for the sync_status tool.
-type SyncStatusInput struct{}
 
 // SyncStatusOutput is the output for the sync_status tool.
 type SyncStatusOutput struct {

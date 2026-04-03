@@ -177,7 +177,7 @@ func TestListTags_Success(t *testing.T) {
 		w.Write([]byte(`[{"id":"tag-1","title":"work"},{"id":"tag-2","title":"personal"}]`))
 	})
 
-	_, out, err := handleListTags(context.Background(), c, ListTagsInput{})
+	_, out, err := handleListTags(context.Background(), c)
 	require.NoError(t, err)
 	require.Len(t, out.Tags, 2)
 	assert.Equal(t, "tag-1", out.Tags[0].ID)
@@ -192,7 +192,7 @@ func TestListTags_APIError(t *testing.T) {
 		w.Write([]byte(`{"error":"unauthorized"}`))
 	})
 
-	_, _, err := handleListTags(context.Background(), c, ListTagsInput{})
+	_, _, err := handleListTags(context.Background(), c)
 	require.Error(t, err)
 	var apiErr *APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -251,7 +251,7 @@ func TestSyncStatus_Success(t *testing.T) {
 		}`))
 	})
 
-	_, out, err := handleSyncStatus(context.Background(), c, SyncStatusInput{})
+	_, out, err := handleSyncStatus(context.Background(), c)
 	require.NoError(t, err)
 	assert.Equal(t, "2025-01-15T10:30:00Z", out.LastSyncAt)
 	assert.Equal(t, "2025-01-15T10:25:00Z", out.LastPushAt)
@@ -268,7 +268,7 @@ func TestSyncStatus_APIError(t *testing.T) {
 		w.Write([]byte(`{"error":"unauthorized"}`))
 	})
 
-	_, _, err := handleSyncStatus(context.Background(), c, SyncStatusInput{})
+	_, _, err := handleSyncStatus(context.Background(), c)
 	require.Error(t, err)
 	var apiErr *APIError
 	require.ErrorAs(t, err, &apiErr)

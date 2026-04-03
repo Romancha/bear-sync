@@ -99,8 +99,8 @@ func registerListTags(s *mcp.Server, c *Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_tags",
 		Description: "List all tags from Bear notes",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ListTagsInput) (*mcp.CallToolResult, ListTagsOutput, error) {
-		return handleListTags(ctx, c, input)
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, ListTagsOutput, error) {
+		return handleListTags(ctx, c)
 	})
 }
 
@@ -117,8 +117,8 @@ func registerSyncStatus(s *mcp.Server, c *Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "sync_status",
 		Description: "Get the current sync status between Bear and Salmon Hub",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, input SyncStatusInput) (*mcp.CallToolResult, SyncStatusOutput, error) {
-		return handleSyncStatus(ctx, c, input)
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ any) (*mcp.CallToolResult, SyncStatusOutput, error) {
+		return handleSyncStatus(ctx, c)
 	})
 }
 
@@ -162,7 +162,7 @@ func handleListNotes(ctx context.Context, c *Client, input ListNotesInput) (*mcp
 	return nil, out, nil
 }
 
-func handleListTags(ctx context.Context, c *Client, _ ListTagsInput) (*mcp.CallToolResult, ListTagsOutput, error) {
+func handleListTags(ctx context.Context, c *Client) (*mcp.CallToolResult, ListTagsOutput, error) {
 	data, err := c.get(ctx, "/api/tags", nil)
 	if err != nil {
 		return nil, ListTagsOutput{}, err
@@ -192,7 +192,7 @@ func handleGetAttachment(ctx context.Context, c *Client, input GetAttachmentInpu
 	}, nil
 }
 
-func handleSyncStatus(ctx context.Context, c *Client, _ SyncStatusInput) (*mcp.CallToolResult, SyncStatusOutput, error) {
+func handleSyncStatus(ctx context.Context, c *Client) (*mcp.CallToolResult, SyncStatusOutput, error) {
 	data, err := c.get(ctx, "/api/sync/status", nil)
 	if err != nil {
 		return nil, SyncStatusOutput{}, err
