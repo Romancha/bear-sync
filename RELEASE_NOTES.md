@@ -1,5 +1,19 @@
 # Release Notes
 
+## Version 0.6.1 — 03 Apr 2026
+
+### ✨ Improvements
+
+- Add detailed MCP server instructions for AI agents: Markdown format, async write flow, encrypted notes, conflict handling, tag duplication warning.
+- Improve MCP tool descriptions with error codes (403/409) and behavioral notes (e.g. list_notes omits body).
+
+### 🐞 Fixes
+
+- Fix OpenClaw MCP config format in README (`mcp.servers` instead of `mcpServers`).
+- Fix release asset naming for stable download URLs (removed version from binary filenames).
+
+---
+
 ## Version 0.6.0 — 02 Apr 2026
 
 ### 🎉 Major Features
