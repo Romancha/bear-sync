@@ -1,5 +1,13 @@
 # Release Notes
 
+## Version 0.7.2 — 03 Apr 2026
+
+### 🐞 Fixes
+
+- Fix file attachments (PDFs, documents) not syncing to hub. Bear preserves the original file's modification timestamp instead of using the time the file was added to the note, causing delta sync to miss attachments with old timestamps. The bridge now detects new attachments via UUID diff in addition to the timestamp-based query.
+
+---
+
 ## Version 0.7.1 — 03 Apr 2026
 
 ### ✨ Improvements
